@@ -13,6 +13,7 @@ import type {MainTabParamList} from '../../../app/navigation/types';
 import {BrandMark} from '../../../components/common/BrandMark';
 import {colors, radius, spacing} from '../../../constants/theme';
 import {useAuthStore} from '../../auth/store/authStore';
+import {useFamilyStore} from '../../family/store/familyStore';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
 
@@ -46,6 +47,7 @@ function getGreeting(hour: number): string {
 
 export function HomeScreen({navigation}: Props) {
   const session = useAuthStore(state => state.session);
+  const family = useFamilyStore(state => state.family);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -60,6 +62,8 @@ export function HomeScreen({navigation}: Props) {
     }
     return session?.user.email?.split('@')[0] ?? 'Keluarga DiaryQu';
   }, [session]);
+
+  const roleLabel = family?.role === 'head' ? 'Kepala Keluarga' : 'Anggota Keluarga';
 
   const formattedDate = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
@@ -86,7 +90,7 @@ export function HomeScreen({navigation}: Props) {
               <Text style={styles.userName} numberOfLines={1}>
                 {displayName}
               </Text>
-              <Text style={styles.userRole}>Anggota Keluarga</Text>
+              <Text style={styles.userRole}>{roleLabel}</Text>
             </View>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
@@ -141,9 +145,9 @@ export function HomeScreen({navigation}: Props) {
 
         <SectionHeader title="Statistik Keluarga" action="Hari ini" />
         <View style={styles.statsEmptyCard}>
-          <Text style={styles.statsEmptyTitle}>Statistik keluarga belum tersedia</Text>
+          <Text style={styles.statsEmptyTitle}>{family?.name ?? 'Family Room DiaryQu'}</Text>
           <Text style={styles.statsEmptyText}>
-            Progress anggota akan muncul setelah Family Room dan rutinitas aktif.
+            Progress anggota akan muncul setelah modul Rutinitas terhubung dengan database.
           </Text>
         </View>
 
@@ -172,9 +176,11 @@ export function HomeScreen({navigation}: Props) {
             <Text style={styles.familyIllustrationText}>☺</Text>
           </View>
           <View style={styles.familyBody}>
-            <Text style={styles.familyTitle}>Family Room DiaryQu</Text>
+            <Text style={styles.familyTitle}>{family?.name ?? 'Family Room DiaryQu'}</Text>
             <View style={styles.familyCodePill}>
-              <Text style={styles.familyCodeText}>Family Code belum tersedia</Text>
+              <Text style={styles.familyCodeText}>
+                Family Code: {family?.familyCode ?? '—'}
+              </Text>
             </View>
           </View>
         </View>
@@ -280,5 +286,5 @@ const styles = StyleSheet.create({
   familyBody: {flex: 1, paddingLeft: 10, paddingBottom: 22},
   familyTitle: {color: '#FFFFFF', fontSize: 15, fontWeight: '800'},
   familyCodePill: {marginTop: 10, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)'},
-  familyCodeText: {color: '#FFFFFF', fontSize: 11, textAlign: 'center'},
+  familyCodeText: {color: '#FFFFFF', fontSize: 11, textAlign: 'center', fontWeight: '700'},
 });

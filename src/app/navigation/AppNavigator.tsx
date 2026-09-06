@@ -8,6 +8,8 @@ import {colors} from '../../constants/theme';
 import {AgendaScreen} from '../../features/agenda/screens/AgendaScreen';
 import {LoginScreen} from '../../features/auth/screens/LoginScreen';
 import {useAuthStore} from '../../features/auth/store/authStore';
+import {FamilySetupScreen} from '../../features/family/screens/FamilySetupScreen';
+import {useFamilyStore} from '../../features/family/store/familyStore';
 import {FinanceScreen} from '../../features/finance/screens/FinanceScreen';
 import {HomeScreen} from '../../features/home/screens/HomeScreen';
 import {RoutinesScreen} from '../../features/routines/screens/RoutinesScreen';
@@ -39,6 +41,15 @@ const TAB_META: Record<
   Routines: {label: 'Rutinitas', glyph: '✓'},
   Finance: {label: 'Keuangan', glyph: '▣'},
 };
+
+function AppLoadingScreen({message = 'DiaryQu'}: {message?: string}) {
+  return (
+    <View style={styles.bootScreen}>
+      <ActivityIndicator size="large" color="#FFFFFF" />
+      <Text style={styles.bootText}>{message}</Text>
+    </View>
+  );
+}
 
 function MainTabs() {
   return (
@@ -75,11 +86,7 @@ function MainTabs() {
           }
 
           return (
-            <Text
-              style={[
-                styles.tabGlyph,
-                {color: focused ? colors.primary : '#69716F'},
-              ]}>
+            <Text style={focused ? styles.tabGlyphActive : styles.tabGlyph}>
               {meta.glyph}
             </Text>
           );
@@ -102,15 +109,39 @@ function AuthNavigator() {
   );
 }
 
+function FamilyGate() {
+  const familyStatus = useFamilyStore(state => state.status);
+  const loadFamily = useFamilyStore(state => state.load);
+
+  useEffect(() => {
+    if (familyStatus === 'idle') {
+      loadFamily().catch(() => undefined);
+    }
+  }, [familyStatus, loadFamily]);
+
+  if (familyStatus === 'idle' || familyStatus === 'loading') {
+    return <AppLoadingScreen message="Menyiapkan Family Room" />;
+  }
+
+  if (familyStatus === 'ready') {
+    return <MainTabs />;
+  }
+
+  return <FamilySetupScreen />;
+}
+
 export function AppNavigator() {
   const status = useAuthStore(state => state.status);
+  const session = useAuthStore(state => state.session);
   const initialize = useAuthStore(state => state.initialize);
+  const resetFamily = useFamilyStore(state => state.reset);
+  const userId = session?.user.id ?? null;
 
   useEffect(() => {
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
 
-    void initialize().then(cleanup => {
+    initialize().then(cleanup => {
       if (disposed) {
         cleanup?.();
         return;
@@ -124,18 +155,21 @@ export function AppNavigator() {
     };
   }, [initialize]);
 
+  useEffect(() => {
+    resetFamily();
+  }, [userId, resetFamily]);
+
   if (status === 'booting') {
-    return (
-      <View style={styles.bootScreen}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-        <Text style={styles.bootText}>DiaryQu</Text>
-      </View>
-    );
+    return <AppLoadingScreen />;
   }
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {status === 'authenticated' ? <MainTabs /> : <AuthNavigator />}
+      {status === 'authenticated' && session ? (
+        <FamilyGate key={session.user.id} />
+      ) : (
+        <AuthNavigator />
+      )}
     </NavigationContainer>
   );
 }
@@ -148,8 +182,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
   },
-  bootText: {color: '#FFFFFF', fontSize: 24, fontWeight: '800'},
-  tabGlyph: {fontSize: 23, fontWeight: '800'},
+  bootText: {color: '#FFFFFF', fontSize: 20, fontWeight: '800'},
+  tabGlyph: {fontSize: 23, fontWeight: '800', color: '#69716F'},
+  tabGlyphActive: {fontSize: 23, fontWeight: '800', color: colors.primary},
   trackingTabOuter: {
     width: 58,
     height: 58,
