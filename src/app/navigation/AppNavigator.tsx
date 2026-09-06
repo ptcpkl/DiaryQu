@@ -8,15 +8,22 @@ import {colors} from '../../constants/theme';
 import {AgendaScreen} from '../../features/agenda/screens/AgendaScreen';
 import {LoginScreen} from '../../features/auth/screens/LoginScreen';
 import {useAuthStore} from '../../features/auth/store/authStore';
+import {ContributionScreen} from '../../features/contribution/screens/ContributionScreen';
 import {FamilySetupScreen} from '../../features/family/screens/FamilySetupScreen';
 import {useFamilyStore} from '../../features/family/store/familyStore';
 import {FinanceScreen} from '../../features/finance/screens/FinanceScreen';
 import {HomeScreen} from '../../features/home/screens/HomeScreen';
+import {ProfileScreen} from '../../features/profile/screens/ProfileScreen';
 import {RoutinesScreen} from '../../features/routines/screens/RoutinesScreen';
 import {TrackingScreen} from '../../features/tracking/screens/TrackingScreen';
-import type {AuthStackParamList, MainTabParamList} from './types';
+import type {
+  AppStackParamList,
+  AuthStackParamList,
+  MainTabParamList,
+} from './types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const AppStack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const navigationTheme = {
@@ -101,6 +108,16 @@ function MainTabs() {
   );
 }
 
+function AppStackNavigator() {
+  return (
+    <AppStack.Navigator screenOptions={{headerShown: false}}>
+      <AppStack.Screen name="MainTabs" component={MainTabs} />
+      <AppStack.Screen name="Profile" component={ProfileScreen} />
+      <AppStack.Screen name="Contribution" component={ContributionScreen} />
+    </AppStack.Navigator>
+  );
+}
+
 function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{headerShown: false}}>
@@ -124,7 +141,7 @@ function FamilyGate() {
   }
 
   if (familyStatus === 'ready') {
-    return <MainTabs />;
+    return <AppStackNavigator />;
   }
 
   return <FamilySetupScreen />;
