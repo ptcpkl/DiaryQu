@@ -9,6 +9,7 @@ type AgendaRow = {
   notes: string | null;
   location: string | null;
   starts_at: string;
+  ends_at: string | null;
   reminder_enabled: boolean;
   reminder_at: string | null;
   status: AgendaStatus;
@@ -25,6 +26,7 @@ function toEntry(row: AgendaRow): AgendaEntry {
     notes: row.notes,
     location: row.location,
     startsAt: row.starts_at,
+    endsAt: row.ends_at,
     reminderEnabled: row.reminder_enabled,
     reminderAt: row.reminder_at,
     status: row.status,
@@ -39,6 +41,7 @@ function toPayload(draft: AgendaDraft) {
     notes: draft.notes?.trim() || null,
     location: draft.location?.trim() || null,
     starts_at: draft.startsAt,
+    ends_at: draft.endsAt ?? null,
     reminder_enabled: draft.reminderEnabled,
     reminder_at: draft.reminderEnabled ? draft.reminderAt ?? draft.startsAt : null,
     status: draft.status ?? 'scheduled',
