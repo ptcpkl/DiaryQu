@@ -9,12 +9,16 @@ create table if not exists public.agenda_entries (
   notes text check (notes is null or char_length(notes) <= 1000),
   location text check (location is null or char_length(location) <= 240),
   starts_at timestamptz not null,
+  ends_at timestamptz,
   reminder_enabled boolean not null default true,
   reminder_at timestamptz,
   status text not null default 'scheduled'
     check (status in ('scheduled', 'postponed', 'completed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint agenda_time_consistency check (
+    ends_at is null or ends_at > starts_at
+  ),
   constraint agenda_reminder_consistency check (
     (reminder_enabled = false and reminder_at is null)
     or
