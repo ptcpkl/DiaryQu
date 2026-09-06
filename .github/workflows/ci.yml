@@ -9,7 +9,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -20,6 +20,12 @@ jobs:
         with:
           node-version: 22.13.0
           cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
 
       - name: Install dependencies
         run: npm ci
@@ -32,3 +38,9 @@ jobs:
 
       - name: Tests
         run: npm test -- --runInBand
+
+      - name: Android Kotlin compile
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileDebugKotlin --no-daemon
