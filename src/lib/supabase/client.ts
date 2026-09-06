@@ -3,6 +3,11 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {createClient, type SupabaseClient} from '@supabase/supabase-js';
 
+import {
+  DIARYQU_SUPABASE_PUBLISHABLE_KEY,
+  DIARYQU_SUPABASE_URL,
+} from '../../config/supabase';
+
 type RuntimeProcess = {
   env?: {
     SUPABASE_URL?: string;
@@ -17,17 +22,15 @@ type RuntimeGlobal = typeof globalThis & {
 
 const runtimeProcess = (globalThis as RuntimeGlobal).process;
 
-export const supabaseUrl = runtimeProcess?.env?.SUPABASE_URL?.trim() ?? '';
-export const supabasePublishableKey =
-  runtimeProcess?.env?.SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
-export const supabaseAnonKey =
-  runtimeProcess?.env?.SUPABASE_ANON_KEY?.trim() ?? '';
+export const supabaseUrl =
+  runtimeProcess?.env?.SUPABASE_URL?.trim() || DIARYQU_SUPABASE_URL;
 
-// Supabase recommends publishable keys for new clients. Keep legacy anon-key
-// fallback so existing environments continue to work during migration.
-export const supabaseClientKey = supabasePublishableKey || supabaseAnonKey;
+export const supabasePublicKey =
+  runtimeProcess?.env?.SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  runtimeProcess?.env?.SUPABASE_ANON_KEY?.trim() ||
+  DIARYQU_SUPABASE_PUBLISHABLE_KEY;
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseClientKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublicKey);
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -37,7 +40,7 @@ export function getSupabaseClient(): SupabaseClient {
   }
 
   if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, supabaseClientKey, {
+    supabaseClient = createClient(supabaseUrl, supabasePublicKey, {
       auth: {
         storage: AsyncStorage,
         autoRefreshToken: true,
