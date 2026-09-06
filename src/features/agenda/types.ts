@@ -8,6 +8,7 @@ export type AgendaEntry = {
   notes: string | null;
   location: string | null;
   startsAt: string;
+  endsAt: string | null;
   reminderEnabled: boolean;
   reminderAt: string | null;
   status: AgendaStatus;
@@ -20,6 +21,7 @@ export type AgendaDraft = {
   notes?: string | null;
   location?: string | null;
   startsAt: string;
+  endsAt?: string | null;
   reminderEnabled: boolean;
   reminderAt?: string | null;
   status?: AgendaStatus;
