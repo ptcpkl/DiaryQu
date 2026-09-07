@@ -31,7 +31,7 @@ type QuickMenu = {
 const QUICK_MENU: QuickMenu[] = [
   {label: 'Agenda', glyph: '▦', target: 'Agenda'},
   {label: 'Rutinitas Hari Ini', glyph: '✓', target: 'Routines'},
-  {label: 'Goresan', glyph: '✎'},
+  {label: 'Goresan', glyph: '✎', appTarget: 'Goresan'},
   {label: 'Keuangan', glyph: '▣', target: 'Finance'},
   {label: 'AssetQu', glyph: '▤', target: 'Finance'},
   {label: 'Kontribusi', glyph: '♥', appTarget: 'Contribution'},
