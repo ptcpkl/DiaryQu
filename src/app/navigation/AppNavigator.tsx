@@ -12,6 +12,7 @@ import {ContributionScreen} from '../../features/contribution/screens/Contributi
 import {FamilySetupScreen} from '../../features/family/screens/FamilySetupScreen';
 import {useFamilyStore} from '../../features/family/store/familyStore';
 import {FinanceScreen} from '../../features/finance/screens/FinanceScreen';
+import {GoresanScreen} from '../../features/goresan/screens/GoresanScreen';
 import {HomeScreen} from '../../features/home/screens/HomeScreen';
 import {ProfileScreen} from '../../features/profile/screens/ProfileScreen';
 import {RoutinesScreen} from '../../features/routines/screens/RoutinesScreen';
@@ -114,6 +115,7 @@ function AppStackNavigator() {
       <AppStack.Screen name="MainTabs" component={MainTabs} />
       <AppStack.Screen name="Profile" component={ProfileScreen} />
       <AppStack.Screen name="Contribution" component={ContributionScreen} />
+      <AppStack.Screen name="Goresan" component={GoresanScreen} />
     </AppStack.Navigator>
   );
 }
