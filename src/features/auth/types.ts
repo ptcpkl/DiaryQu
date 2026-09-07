@@ -1,7 +1,11 @@
+export interface AppUserMetadata extends Record<string, unknown> {
+  full_name?: string;
+}
+
 export interface AppUser {
   id: string;
   email?: string;
-  user_metadata: Record<string, unknown>;
+  user_metadata: AppUserMetadata;
 }
 
 export interface AppSession {
