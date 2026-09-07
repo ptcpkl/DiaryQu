@@ -12,11 +12,25 @@ Client menggunakan publishable key Supabase. Publishable key memang ditujukan un
 
 Database schema DiaryQu dikelola melalui folder `supabase/migrations`.
 
+## Frontend demo mode
+
+Selama fase frontend-first, `src/config/appMode.ts` mengaktifkan `FRONTEND_DEMO_MODE`.
+
+Saat aktif:
+
+- tombol `Log In` langsung masuk tanpa autentikasi Supabase
+- user demo menggunakan identitas `Pak Dahlan`
+- Family Room demo menggunakan `Keluarga Pak Dahlan` dengan role `head`
+- Agenda memakai repository in-memory agar UI CRUD dapat diuji tanpa database
+- `Log Out` mengembalikan aplikasi ke Login
+
+Supabase dan service production tetap berada di codebase. Setelah UI selesai, demo mode dapat dimatikan tanpa membangun ulang screen dari nol.
+
 ## Flow aplikasi saat ini
 
-`Login → cek Family Room → Buat/Gabung Family Room → Home`
+`Login → Demo Session → Family Room Demo → Home`
 
-Role `head/member` ditentukan oleh RPC database dan tidak diterima sebagai input bebas dari client.
+Saat demo mode dimatikan, flow kembali menggunakan Supabase Auth + Family Room backend.
 
 ## Development
 

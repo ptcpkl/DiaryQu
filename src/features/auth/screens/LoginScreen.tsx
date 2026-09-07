@@ -13,6 +13,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {BrandMark} from '../../../components/common/BrandMark';
+import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
 import {colors, radius, spacing} from '../../../constants/theme';
 import {isSupabaseConfigured} from '../../../lib/supabase/client';
 import {useAuthStore} from '../store/authStore';
@@ -28,6 +29,16 @@ export function LoginScreen() {
   const clearError = useAuthStore(state => state.clearError);
 
   const handleSubmit = async () => {
+    if (FRONTEND_DEMO_MODE) {
+      setValidation({});
+      clearError();
+      await signIn({
+        email: email.trim() || 'pak.dahlan@diaryqu.demo',
+        password: password || 'demo-password',
+      });
+      return;
+    }
+
     const nextValidation = validateLogin(email, password);
     setValidation(nextValidation);
 
@@ -101,7 +112,7 @@ export function LoginScreen() {
 
               {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
-              {!isSupabaseConfigured ? (
+              {!FRONTEND_DEMO_MODE && !isSupabaseConfigured ? (
                 <Text style={styles.configHint}>
                   Backend Supabase belum terhubung. UI siap, autentikasi akan aktif
                   setelah environment project diisi.

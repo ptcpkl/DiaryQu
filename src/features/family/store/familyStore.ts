@@ -1,5 +1,7 @@
 import {create} from 'zustand';
 
+import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
+import {DEMO_FAMILY, DEMO_FAMILY_ID} from '../../../mocks/demoData';
 import {familyService} from '../services/familyService';
 import type {FamilyLoadStatus, FamilySummary} from '../types';
 
@@ -50,6 +52,12 @@ export const useFamilyStore = create<FamilyState>(set => ({
 
   load: async () => {
     set({status: 'loading', error: null});
+
+    if (FRONTEND_DEMO_MODE) {
+      set({family: DEMO_FAMILY, status: 'ready', error: null});
+      return;
+    }
+
     try {
       const family = await familyService.getCurrentFamily();
       set({family, status: family ? 'ready' : 'empty'});
@@ -65,6 +73,20 @@ export const useFamilyStore = create<FamilyState>(set => ({
     }
 
     set({isSubmitting: true, error: null});
+
+    if (FRONTEND_DEMO_MODE) {
+      set({
+        family: {
+          ...DEMO_FAMILY,
+          name: name.trim(),
+          role: 'head',
+        },
+        status: 'ready',
+        isSubmitting: false,
+      });
+      return true;
+    }
+
     try {
       const family = await familyService.createFamily(name);
       set({family, status: 'ready', isSubmitting: false});
@@ -82,6 +104,21 @@ export const useFamilyStore = create<FamilyState>(set => ({
     }
 
     set({isSubmitting: true, error: null});
+
+    if (FRONTEND_DEMO_MODE) {
+      set({
+        family: {
+          id: DEMO_FAMILY_ID,
+          name: 'Keluarga Pak Dahlan',
+          familyCode: code.trim().toUpperCase(),
+          role: 'member',
+        },
+        status: 'ready',
+        isSubmitting: false,
+      });
+      return true;
+    }
+
     try {
       const family = await familyService.joinFamily(code);
       set({family, status: 'ready', isSubmitting: false});

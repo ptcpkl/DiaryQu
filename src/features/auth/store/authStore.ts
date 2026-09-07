@@ -1,13 +1,15 @@
-import type {Session} from '@supabase/supabase-js';
 import {create} from 'zustand';
 
+import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
 import {isSupabaseConfigured} from '../../../lib/supabase/client';
+import {DEMO_SESSION} from '../../../mocks/demoData';
 import {authService, type LoginCredentials} from '../services/authService';
+import type {AppSession} from '../types';
 
 type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 
 interface AuthState {
-  session: Session | null;
+  session: AppSession | null;
   status: AuthStatus;
   isSubmitting: boolean;
   error: string | null;
@@ -38,6 +40,16 @@ export const useAuthStore = create<AuthState>(set => ({
   error: null,
 
   initialize: async () => {
+    if (FRONTEND_DEMO_MODE) {
+      set({
+        status: 'unauthenticated',
+        session: null,
+        isSubmitting: false,
+        error: null,
+      });
+      return undefined;
+    }
+
     if (!isSupabaseConfigured) {
       set({status: 'unauthenticated', session: null});
       return undefined;
@@ -69,6 +81,16 @@ export const useAuthStore = create<AuthState>(set => ({
   signIn: async credentials => {
     set({isSubmitting: true, error: null});
 
+    if (FRONTEND_DEMO_MODE) {
+      set({
+        session: DEMO_SESSION,
+        status: 'authenticated',
+        isSubmitting: false,
+        error: null,
+      });
+      return;
+    }
+
     try {
       const session = await authService.signInWithPassword(credentials);
       set({session, status: 'authenticated', isSubmitting: false});
@@ -79,6 +101,16 @@ export const useAuthStore = create<AuthState>(set => ({
 
   signOut: async () => {
     set({isSubmitting: true, error: null});
+
+    if (FRONTEND_DEMO_MODE) {
+      set({
+        session: null,
+        status: 'unauthenticated',
+        isSubmitting: false,
+        error: null,
+      });
+      return;
+    }
 
     try {
       if (isSupabaseConfigured) {
