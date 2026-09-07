@@ -11,6 +11,7 @@ export type AppStackParamList = {
   MainTabs: undefined;
   Profile: undefined;
   Contribution: undefined;
+  Goresan: undefined;
 };
 
 export type MainTabParamList = {
