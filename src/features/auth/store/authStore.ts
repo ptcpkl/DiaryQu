@@ -16,6 +16,7 @@ interface AuthState {
   initialize: () => Promise<(() => void) | undefined>;
   signIn: (credentials: LoginCredentials) => Promise<void>;
   signOut: () => Promise<void>;
+  applyProfileName: (fullName: string) => void;
   clearError: () => void;
 }
 
@@ -83,7 +84,13 @@ export const useAuthStore = create<AuthState>(set => ({
 
     if (FRONTEND_DEMO_MODE) {
       set({
-        session: DEMO_SESSION,
+        session: {
+          ...DEMO_SESSION,
+          user: {
+            ...DEMO_SESSION.user,
+            user_metadata: {...DEMO_SESSION.user.user_metadata},
+          },
+        },
         status: 'authenticated',
         isSubmitting: false,
         error: null,
@@ -121,6 +128,22 @@ export const useAuthStore = create<AuthState>(set => ({
       set({isSubmitting: false, error: toUserMessage(error)});
     }
   },
+
+  applyProfileName: fullName =>
+    set(state => ({
+      session: state.session
+        ? {
+            ...state.session,
+            user: {
+              ...state.session.user,
+              user_metadata: {
+                ...state.session.user.user_metadata,
+                full_name: fullName,
+              },
+            },
+          }
+        : null,
+    })),
 
   clearError: () => set({error: null}),
 }));
