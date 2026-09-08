@@ -1,6 +1,8 @@
 package com.diaryqu
 
 import android.app.Application
+import com.diaryqu.ads.DiaryQuAds
+import com.diaryqu.ads.DiaryQuAdsPackage
 import com.diaryqu.agenda.AgendaReminderPackage
 import com.diaryqu.routines.RoutineProofPickerPackage
 import com.diaryqu.tracking.FamilyLocationPackage
@@ -20,12 +22,14 @@ class MainApplication : Application(), ReactApplication {
           add(AgendaReminderPackage())
           add(RoutineProofPickerPackage())
           add(FamilyLocationPackage())
+          add(DiaryQuAdsPackage())
         },
     )
   }
 
   override fun onCreate() {
     super.onCreate()
+    DiaryQuAds.initialize(this)
     loadReactNative(this)
   }
 }
