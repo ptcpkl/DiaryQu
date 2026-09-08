@@ -26,6 +26,14 @@ Saat aktif:
 
 Supabase dan service production tetap berada di codebase. Setelah UI selesai, demo mode dapat dimatikan tanpa membangun ulang screen dari nol.
 
+## Design system
+
+Token visual utama berada di `src/constants/theme.ts` dan primitive reusable berada di `src/components/ui`.
+
+Gunakan primitive tersebut untuk typography, button, text field, card, chip, avatar, icon badge, screen/section header, dan floating action button agar screen DiaryQu konsisten.
+
+Dokumentasi lengkap: `docs/design-system.md`.
+
 ## Flow aplikasi saat ini
 
 `Login → Demo Session → Family Room Demo → Home`

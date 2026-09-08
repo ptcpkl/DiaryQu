@@ -4,7 +4,16 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React, {useEffect} from 'react';
 import {ActivityIndicator, StyleSheet, Text, View} from 'react-native';
 
-import {colors} from '../../constants/theme';
+import {AppText} from '../../components/ui';
+import {
+  colors,
+  controlSize,
+  fontWeight,
+  iconSize,
+  shadows,
+  spacing,
+  typography,
+} from '../../constants/theme';
 import {AgendaScreen} from '../../features/agenda/screens/AgendaScreen';
 import {LoginScreen} from '../../features/auth/screens/LoginScreen';
 import {useAuthStore} from '../../features/auth/store/authStore';
@@ -53,8 +62,10 @@ const TAB_META: Record<
 function AppLoadingScreen({message = 'DiaryQu'}: {message?: string}) {
   return (
     <View style={styles.bootScreen}>
-      <ActivityIndicator size="large" color="#FFFFFF" />
-      <Text style={styles.bootText}>{message}</Text>
+      <ActivityIndicator size="large" color={colors.primaryOn} />
+      <AppText variant="heading" tone="onPrimary">
+        {message}
+      </AppText>
     </View>
   );
 }
@@ -67,18 +78,19 @@ function MainTabs() {
         tabBarHideOnKeyboard: true,
         tabBarLabel: TAB_META[route.name].label,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: '#66716D',
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: -2,
+          fontSize: typography.micro,
+          fontWeight: fontWeight.semibold,
+          marginTop: -spacing.xxs,
         },
         tabBarStyle: {
-          height: 74,
+          height: controlSize.tabBar,
           paddingTop: 9,
-          paddingBottom: 8,
+          paddingBottom: spacing.sm,
           borderTopColor: colors.border,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.surface,
+          ...shadows.sm,
         },
         tabBarIcon: ({focused}) => {
           const meta = TAB_META[route.name];
@@ -199,21 +211,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: spacing.lg,
   },
-  bootText: {color: '#FFFFFF', fontSize: 20, fontWeight: '800'},
-  tabGlyph: {fontSize: 23, fontWeight: '800', color: '#69716F'},
-  tabGlyphActive: {fontSize: 23, fontWeight: '800', color: colors.primary},
+  tabGlyph: {
+    fontSize: iconSize.md,
+    fontWeight: fontWeight.extrabold,
+    color: colors.textMuted,
+  },
+  tabGlyphActive: {
+    fontSize: iconSize.md,
+    fontWeight: fontWeight.extrabold,
+    color: colors.primary,
+  },
   trackingTabOuter: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -28,
     borderWidth: 1,
-    borderColor: '#D5DFDB',
+    borderColor: colors.border,
+    ...shadows.sm,
   },
   trackingTabInner: {
     width: 42,
@@ -223,5 +243,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trackingGlyph: {color: '#FFFFFF', fontSize: 21, lineHeight: 22},
+  trackingGlyph: {
+    color: colors.primaryOn,
+    fontSize: iconSize.md,
+    lineHeight: iconSize.md,
+  },
 });
