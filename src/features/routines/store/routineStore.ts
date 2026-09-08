@@ -51,7 +51,7 @@ function routineError(error: unknown): string {
     normalized.includes('SAVE_FAMILY_ROUTINE') ||
     normalized.includes('SUBMIT_ROUTINE_COMPLETION')
   ) {
-    return 'Database Rutinitas belum siap. Jalankan migration Tahap 5 di Supabase terlebih dahulu.';
+    return 'Database Rutinitas belum siap. Jalankan migration Rutinitas terbaru di Supabase terlebih dahulu.';
   }
   if (normalized.includes('ROUTINE-PROOFS') || normalized.includes('BUCKET')) {
     return 'Penyimpanan bukti Rutinitas belum siap. Jalankan bagian Storage pada migration Tahap 5.';
@@ -70,6 +70,15 @@ function routineError(error: unknown): string {
   }
   if (normalized.includes('PROOF_REQUIRED')) {
     return 'Rutinitas ini membutuhkan bukti foto.';
+  }
+  if (
+    normalized.includes('OWNER_REQUIRED') ||
+    normalized.includes('SELF_ASSIGNMENT_REQUIRED')
+  ) {
+    return 'Anggota hanya dapat mengelola rutinitas yang dibuat dan ditugaskan untuk dirinya sendiri.';
+  }
+  if (normalized.includes('FAMILY_MEMBER_REQUIRED')) {
+    return 'Akun ini tidak lagi tergabung dalam Family Room tersebut.';
   }
   if (normalized.includes('ROW-LEVEL SECURITY') || normalized.includes('42501')) {
     return 'Akun ini tidak memiliki izin untuk melakukan tindakan tersebut.';
