@@ -25,17 +25,21 @@ This file tracks feature delivery against the DiaryQu PRD and current product de
 - Account Settings for authenticated user profile name and phone number with self-only profile persistence and auth display-name synchronization
 - Family Room settings with member list, Family Code sharing/regeneration, family rename, secure Head transfer, Head-only member removal, and Member leave-room flow
 - Family role mutations are RPC-only and enforce one Head per Family Room; client state cannot self-promote to Head
-- Automated profile/family helper tests plus existing TypeScript, ESLint, Jest, and Android Kotlin compile coverage
+- Android Google Mobile Ads SDK integration with a reusable React Native banner view
+- Beranda ad placeholder replaced by a real banner placement using official Google test inventory in debug builds
+- Release ads are fail-closed until production enable flag and non-sample AdMob IDs are supplied
+- DiaryQu ad requests are non-personalized, capped to G-rated content, and do not add first-party Family Room/profile/location/finance data
+- Automated ads configuration tests plus existing TypeScript, ESLint, Jest, and Android Kotlin compile coverage
 
 ## Current milestone
 
-- Stage 9: Profile + Family Room / Settings polish complete in code
-- Database migration `20260908164000_profile_family_settings.sql` must be applied manually before production mode uses Family Room management actions
-- Profile edits reuse the existing `profiles` table from Family Foundation; no new profile table is introduced
-- Family metadata changes are RPC-only from Stage 9 onward, and direct authenticated updates to `families` are revoked
+- Stage 10: Ads / Monetization integration complete in code
+- Debug builds use official Google test ads only
+- Release monetization remains disabled by default until `DIARYQU_ADS_PRODUCTION_ENABLED=true` and real AdMob App/Banner IDs are supplied
+- There is one banner placement on Beranda; no interstitial, app-open, rewarded, or forced full-screen ad formats are enabled
+- Production rollout checklist is documented in `docs/ADS_MONETIZATION.md`
 
 ## Next milestones
 
-- Ads integration and monetization shell
-- Cross-feature hardening, visual polish, and accessibility pass
-- Play Store release preparation
+- Stage 11: Cross-feature hardening, visual polish, accessibility, reliability, and release-readiness pass
+- Play Store release preparation / final release checklist
