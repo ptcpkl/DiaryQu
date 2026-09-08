@@ -11,6 +11,7 @@ import {
 } from './date';
 
 export const AGENDA_REMINDER_MINUTES = 5;
+export const REMINDER_OPTIONS = [AGENDA_REMINDER_MINUTES] as const;
 
 export type AgendaEditorValues = {
   title: string;
@@ -20,6 +21,7 @@ export type AgendaEditorValues = {
   startTime: string;
   endTime: string;
   reminderEnabled: boolean;
+  reminderMinutes: number;
   status: AgendaStatus;
 };
 
@@ -44,6 +46,7 @@ export function agendaEditorInitialState(
       startTime: editorTime(entry.startsAt),
       endTime: entry.endsAt ? editorTime(entry.endsAt) : '',
       reminderEnabled: entry.reminderEnabled,
+      reminderMinutes: AGENDA_REMINDER_MINUTES,
       status: entry.status,
     };
   }
@@ -61,6 +64,7 @@ export function agendaEditorInitialState(
     startTime: `${String(startHour).padStart(2, '0')}:00`,
     endTime: `${String(endHour).padStart(2, '0')}:00`,
     reminderEnabled: true,
+    reminderMinutes: AGENDA_REMINDER_MINUTES,
     status: 'scheduled',
   };
 }
