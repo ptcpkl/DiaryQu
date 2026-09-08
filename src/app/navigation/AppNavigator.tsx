@@ -29,7 +29,8 @@ import {HomeScreen} from '../../features/home/screens/HomeScreen';
 import {AccountSettingsScreen} from '../../features/profile/screens/AccountSettingsScreen';
 import {ProfileScreen} from '../../features/profile/screens/ProfileScreen';
 import {useProfileStore} from '../../features/profile/store/profileStore';
-import {RoutinesScreen} from '../../features/routines/screens/RoutinesScreen';
+import {MyRoutinesScreen} from '../../features/routines/screens/MyRoutinesScreen';
+import {RoutinesTabScreen} from '../../features/routines/screens/RoutinesTabScreen';
 import {TrackingScreen} from '../../features/tracking/screens/TrackingScreen';
 import type {
   AppStackParamList,
@@ -120,7 +121,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Agenda" component={AgendaScreen} />
       <Tab.Screen name="Tracking" component={TrackingScreen} />
-      <Tab.Screen name="Routines" component={RoutinesScreen} />
+      <Tab.Screen name="Routines" component={RoutinesTabScreen} />
       <Tab.Screen name="Finance" component={FinanceScreen} />
     </Tab.Navigator>
   );
@@ -135,6 +136,7 @@ function AppStackNavigator() {
       <AppStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <AppStack.Screen name="Contribution" component={ContributionScreen} />
       <AppStack.Screen name="Goresan" component={GoresanScreen} />
+      <AppStack.Screen name="MyRoutines" component={MyRoutinesScreen} />
     </AppStack.Navigator>
   );
 }
