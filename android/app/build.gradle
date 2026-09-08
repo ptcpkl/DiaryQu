@@ -16,6 +16,17 @@ def productionAdMobBannerUnitId = (project.findProperty('DIARYQU_ADMOB_BANNER_UN
 def productionAdsEnabled = (project.findProperty('DIARYQU_ADS_PRODUCTION_ENABLED') ?: System.getenv('DIARYQU_ADS_PRODUCTION_ENABLED') ?: 'false').toString().toBoolean()
 def productionUsingSampleIds = productionAdMobAppId == sampleAdMobAppId || productionAdMobBannerUnitId == sampleAdMobBannerUnitId
 
+def releaseStoreFilePath = (project.findProperty('DIARYQU_RELEASE_STORE_FILE') ?: System.getenv('DIARYQU_RELEASE_STORE_FILE') ?: '').toString()
+def releaseStorePassword = (project.findProperty('DIARYQU_RELEASE_STORE_PASSWORD') ?: System.getenv('DIARYQU_RELEASE_STORE_PASSWORD') ?: '').toString()
+def releaseKeyAlias = (project.findProperty('DIARYQU_RELEASE_KEY_ALIAS') ?: System.getenv('DIARYQU_RELEASE_KEY_ALIAS') ?: '').toString()
+def releaseKeyPassword = (project.findProperty('DIARYQU_RELEASE_KEY_PASSWORD') ?: System.getenv('DIARYQU_RELEASE_KEY_PASSWORD') ?: '').toString()
+def releaseSigningConfigured = [
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { !it.isBlank() }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -39,6 +50,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
@@ -49,7 +68,11 @@ android {
             buildConfigField "boolean", "ADS_USING_SAMPLE_IDS", "true"
         }
         release {
-            signingConfig signingConfigs.debug
+            // Never ship with the debug keystore. Release remains unsigned until
+            // DIARYQU_RELEASE_* values are supplied by the release environment.
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             manifestPlaceholders = [admobAppId: productionAdMobAppId]
