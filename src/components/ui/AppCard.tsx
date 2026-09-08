@@ -10,7 +10,7 @@ import {
 import {colors, radius, shadows, spacing} from '../../constants/theme';
 
 export type AppCardVariant = 'default' | 'soft' | 'outlined' | 'primary';
-export type AppCardPadding = 'none' | 'sm' | 'md' | 'lg';
+export type AppCardPadding = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 
 interface AppCardProps extends Omit<PressableProps, 'children' | 'style'> {
   children: ReactNode;
@@ -26,6 +26,7 @@ const paddingBySize: Record<AppCardPadding, number> = {
   sm: spacing.md,
   md: spacing.lg,
   lg: spacing.xl,
+  xl: spacing.xxl,
 };
 
 const backgroundByVariant: Record<AppCardVariant, string> = {
