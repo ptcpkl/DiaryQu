@@ -10,7 +10,7 @@ import {
   formatTime,
 } from './date';
 
-export const REMINDER_OPTIONS = [0, 5, 10, 30, 60] as const;
+export const AGENDA_REMINDER_MINUTES = 5;
 
 export type AgendaEditorValues = {
   title: string;
@@ -20,7 +20,6 @@ export type AgendaEditorValues = {
   startTime: string;
   endTime: string;
   reminderEnabled: boolean;
-  reminderMinutes: number;
   status: AgendaStatus;
 };
 
@@ -37,16 +36,6 @@ export function agendaEditorInitialState(
   entry: AgendaEntry | null,
 ): AgendaEditorValues {
   if (entry) {
-    const start = new Date(entry.startsAt);
-    const reminderMinutes = entry.reminderAt
-      ? Math.max(
-          0,
-          Math.round(
-            (start.getTime() - new Date(entry.reminderAt).getTime()) / 60_000,
-          ),
-        )
-      : 10;
-
     return {
       title: entry.title,
       category: entry.category ?? 'work',
@@ -55,11 +44,6 @@ export function agendaEditorInitialState(
       startTime: editorTime(entry.startsAt),
       endTime: entry.endsAt ? editorTime(entry.endsAt) : '',
       reminderEnabled: entry.reminderEnabled,
-      reminderMinutes: REMINDER_OPTIONS.includes(
-        reminderMinutes as (typeof REMINDER_OPTIONS)[number],
-      )
-        ? reminderMinutes
-        : 10,
       status: entry.status,
     };
   }
@@ -77,7 +61,6 @@ export function agendaEditorInitialState(
     startTime: `${String(startHour).padStart(2, '0')}:00`,
     endTime: `${String(endHour).padStart(2, '0')}:00`,
     reminderEnabled: true,
-    reminderMinutes: 10,
     status: 'scheduled',
   };
 }
@@ -118,13 +101,13 @@ export function buildAgendaDraft(
   const effectiveReminder =
     values.reminderEnabled && values.status !== 'completed';
   const reminderAt = effectiveReminder
-    ? new Date(start.getTime() - values.reminderMinutes * 60_000)
+    ? new Date(start.getTime() - AGENDA_REMINDER_MINUTES * 60_000)
     : null;
 
   if (effectiveReminder && reminderAt && reminderAt.getTime() <= nowMs) {
     return {
       draft: null,
-      error: 'Waktu reminder harus berada di masa depan.',
+      error: 'Agenda dengan reminder harus dimulai lebih dari 5 menit dari sekarang.',
     };
   }
 
@@ -137,9 +120,7 @@ export function buildAgendaDraft(
       startsAt: start.toISOString(),
       endsAt: end?.toISOString() ?? null,
       reminderEnabled: effectiveReminder,
-      reminderAt: effectiveReminder
-        ? reminderAt?.toISOString() ?? start.toISOString()
-        : null,
+      reminderAt: effectiveReminder ? reminderAt?.toISOString() ?? null : null,
       status: values.status,
     },
     error: null,
