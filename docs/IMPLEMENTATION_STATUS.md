@@ -22,16 +22,21 @@ This file tracks feature delivery against the DiaryQu PRD.
 - Daily Routines private proof storage, family-scoped access policies, and signed proof URLs
 - Daily Routines pending/approved/rejected review flow with self-approval protection
 - Daily Routines realtime family refresh and automated schedule tests
+- UangQu transaction persistence with income/expense, category, note, date, and immutable family ownership
+- UangQu lifetime balance, current-month statistics, current-year statistics, and grouped daily history
+- UangQu head-only write permissions with family-member read visibility enforced by RLS
+- UangQu realtime family synchronization, frontend demo repository, editor validation, and automated finance calculations
 
 ## Current milestone
 
-- Stage 5: Daily Routines implementation complete in code
-- Database migration `20260908104500_daily_routines.sql` must be applied manually to the target Supabase project before production mode uses Daily Routines
-- Routine proof storage intentionally uses the existing Supabase Auth + private Supabase Storage security model so family isolation can be enforced without exposing a second unauthenticated storage system
+- Stage 6: UangQu / Finance implementation complete in code
+- Database migration `20260908114000_uangqu_finance.sql` must be applied manually to the target Supabase project before production mode uses UangQu
+- Historical transactions are never destructively reset: lifetime balance uses all transactions, while monthly/yearly statistics are derived from the relevant date periods
+- AssetQu remains a separate domain and is intentionally scheduled for the next milestone
 
 ## Next milestones
 
-- UangQu and AssetQu persistence + UI
+- AssetQu CRUD, categories, timestamps, persistence, and UI
 - Family location tracking
 - Remaining Profile/Family settings polish
 - Ads integration and release hardening
