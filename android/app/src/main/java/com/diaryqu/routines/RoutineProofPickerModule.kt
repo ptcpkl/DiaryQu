@@ -37,7 +37,7 @@ class RoutineProofPickerModule(
       return
     }
 
-    val activity = currentActivity
+    val activity = reactContext.currentActivity
     if (activity == null) {
       promise.reject("ROUTINE_PICKER_NO_ACTIVITY", "Activity Android tidak tersedia.")
       return
