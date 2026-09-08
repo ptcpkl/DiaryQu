@@ -30,6 +30,7 @@ import {
   shadows,
   spacing,
 } from '../../../constants/theme';
+import {DiaryQuBannerAd} from '../../ads/components/DiaryQuBannerAd';
 import {useAuthStore} from '../../auth/store/authStore';
 import {useFamilyStore} from '../../family/store/familyStore';
 import {
@@ -192,16 +193,7 @@ export function HomeScreen({navigation}: Props) {
           </View>
         </View>
 
-        <View style={styles.adBanner} accessibilityLabel="Area iklan">
-          <View style={styles.adIconBox}>
-            <AppText variant="section" tone="secondary">▱</AppText>
-          </View>
-          <View style={styles.adCopy}>
-            <AppText variant="bodyStrong" tone="secondary">Banner Iklan</AppText>
-            <AppText variant="micro" tone="muted">Area monetisasi akan diaktifkan setelah integrasi Ads SDK.</AppText>
-          </View>
-          <Chip label="Ad" tone="neutral" />
-        </View>
+        <DiaryQuBannerAd placement="beranda" />
 
         <View style={styles.inspirationCard}>
           <View style={styles.inspirationHeader}>
@@ -335,9 +327,6 @@ const styles = StyleSheet.create({
   heroMetaDivider: {width: StyleSheet.hairlineWidth, height: 30, backgroundColor: 'rgba(255,255,255,0.28)', marginHorizontal: spacing.sm},
   locationBar: {marginTop: spacing.md, minHeight: 38, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md},
   locationStatus: {opacity: 0.68},
-  adBanner: {minHeight: 82, borderRadius: radius.md, backgroundColor: colors.ad, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md},
-  adIconBox: {width: 46, height: 46, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.54)', alignItems: 'center', justifyContent: 'center'},
-  adCopy: {flex: 1, gap: spacing.xxs},
   inspirationCard: {borderRadius: radius.lg, borderWidth: 1, borderColor: colors.primaryMuted, backgroundColor: '#ECFFF7', padding: spacing.xl, gap: spacing.md},
   inspirationHeader: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   quoteText: {fontStyle: 'italic'},
