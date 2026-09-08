@@ -14,6 +14,10 @@ create table if not exists public.family_member_locations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (family_id, user_id),
+  constraint family_member_locations_membership_fk
+    foreign key (family_id, user_id)
+    references public.family_members(family_id, user_id)
+    on delete cascade,
   constraint family_member_locations_coordinate_pair_check check (
     (latitude is null and longitude is null)
     or (latitude is not null and longitude is not null)
