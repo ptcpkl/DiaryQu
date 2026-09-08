@@ -1,7 +1,7 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
-import {colors} from '../../constants/theme';
+import {colors, fontWeight, radius, spacing, typography} from '../../constants/theme';
 
 interface BrandMarkProps {
   light?: boolean;
@@ -9,7 +9,7 @@ interface BrandMarkProps {
 }
 
 export function BrandMark({light = false, compact = false}: BrandMarkProps) {
-  const textColor = light ? '#FFFFFF' : colors.primaryDark;
+  const textColor = light ? colors.primaryOn : colors.primaryDark;
 
   return (
     <View style={styles.row} accessibilityRole="image" accessibilityLabel="DiaryQu">
@@ -32,36 +32,36 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: spacing.sm,
   },
   book: {
     width: 28,
     height: 24,
     borderWidth: 2,
     borderColor: colors.primary,
-    borderRadius: 5,
+    borderRadius: radius.xs,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{rotate: '-5deg'}],
   },
   bookLight: {
-    borderColor: '#FFFFFF',
+    borderColor: colors.primaryOn,
   },
   bookGlyph: {
     color: colors.primary,
     fontSize: 18,
     lineHeight: 18,
-    fontWeight: '800',
+    fontWeight: fontWeight.extrabold,
   },
   bookGlyphLight: {
-    color: '#FFFFFF',
+    color: colors.primaryOn,
   },
   wordmark: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: fontWeight.bold,
     letterSpacing: -0.5,
   },
   wordmarkCompact: {
-    fontSize: 18,
+    fontSize: typography.section,
   },
 });
