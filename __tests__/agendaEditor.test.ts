@@ -5,7 +5,7 @@ import {
 } from '../src/features/agenda/utils/editor';
 
 describe('agenda editor helpers', () => {
-  it('builds a categorized agenda draft with reminder', () => {
+  it('builds a categorized agenda draft with the fixed five-minute reminder', () => {
     const selectedDate = new Date(2026, 8, 8);
     const nowMs = new Date(2026, 8, 8, 7, 0, 0, 0).getTime();
 
@@ -19,7 +19,7 @@ describe('agenda editor helpers', () => {
         startTime: '09:00',
         endTime: '10:00',
         reminderEnabled: true,
-        reminderMinutes: 10,
+        reminderMinutes: 30,
         status: 'scheduled',
       },
       nowMs,
@@ -33,7 +33,7 @@ describe('agenda editor helpers', () => {
 
     const startsAt = new Date(result.draft!.startsAt).getTime();
     const reminderAt = new Date(result.draft!.reminderAt!).getTime();
-    expect(startsAt - reminderAt).toBe(10 * 60_000);
+    expect(startsAt - reminderAt).toBe(5 * 60_000);
   });
 
   it('rejects an end time that is not after start time', () => {
@@ -79,7 +79,7 @@ describe('agenda editor helpers', () => {
     expect(result.draft?.reminderAt).toBeNull();
   });
 
-  it('hydrates category and reminder offset when editing', () => {
+  it('hydrates category and normalizes reminder to five minutes when editing', () => {
     const entry: AgendaEntry = {
       id: 'agenda-1',
       familyId: 'family-1',
@@ -99,7 +99,7 @@ describe('agenda editor helpers', () => {
 
     const initial = agendaEditorInitialState(new Date(2026, 8, 8), entry);
     expect(initial.category).toBe('islamic');
-    expect(initial.reminderMinutes).toBe(10);
+    expect(initial.reminderMinutes).toBe(5);
     expect(initial.startTime).toBe('18:30');
   });
 });
