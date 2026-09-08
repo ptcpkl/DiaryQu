@@ -18,12 +18,15 @@ import {AgendaScreen} from '../../features/agenda/screens/AgendaScreen';
 import {LoginScreen} from '../../features/auth/screens/LoginScreen';
 import {useAuthStore} from '../../features/auth/store/authStore';
 import {ContributionScreen} from '../../features/contribution/screens/ContributionScreen';
+import {FamilyInfoScreen} from '../../features/family/screens/FamilyInfoScreen';
 import {FamilySetupScreen} from '../../features/family/screens/FamilySetupScreen';
 import {useFamilyStore} from '../../features/family/store/familyStore';
 import {FinanceScreen} from '../../features/finance/screens/FinanceScreen';
 import {GoresanScreen} from '../../features/goresan/screens/GoresanScreen';
 import {HomeScreen} from '../../features/home/screens/HomeScreen';
+import {AccountSettingsScreen} from '../../features/profile/screens/AccountSettingsScreen';
 import {ProfileScreen} from '../../features/profile/screens/ProfileScreen';
+import {useProfileStore} from '../../features/profile/store/profileStore';
 import {RoutinesScreen} from '../../features/routines/screens/RoutinesScreen';
 import {TrackingScreen} from '../../features/tracking/screens/TrackingScreen';
 import type {
@@ -126,6 +129,8 @@ function AppStackNavigator() {
     <AppStack.Navigator screenOptions={{headerShown: false}}>
       <AppStack.Screen name="MainTabs" component={MainTabs} />
       <AppStack.Screen name="Profile" component={ProfileScreen} />
+      <AppStack.Screen name="FamilyInfo" component={FamilyInfoScreen} />
+      <AppStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <AppStack.Screen name="Contribution" component={ContributionScreen} />
       <AppStack.Screen name="Goresan" component={GoresanScreen} />
     </AppStack.Navigator>
@@ -166,6 +171,7 @@ export function AppNavigator() {
   const session = useAuthStore(state => state.session);
   const initialize = useAuthStore(state => state.initialize);
   const resetFamily = useFamilyStore(state => state.reset);
+  const resetProfile = useProfileStore(state => state.reset);
   const userId = session?.user.id ?? null;
 
   useEffect(() => {
@@ -188,7 +194,8 @@ export function AppNavigator() {
 
   useEffect(() => {
     resetFamily();
-  }, [userId, resetFamily]);
+    resetProfile();
+  }, [userId, resetFamily, resetProfile]);
 
   if (status === 'booting') {
     return <AppLoadingScreen />;
