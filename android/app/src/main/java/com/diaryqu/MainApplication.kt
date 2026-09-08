@@ -3,6 +3,7 @@ package com.diaryqu
 import android.app.Application
 import com.diaryqu.agenda.AgendaReminderPackage
 import com.diaryqu.routines.RoutineProofPickerPackage
+import com.diaryqu.tracking.FamilyLocationPackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -18,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(AgendaReminderPackage())
           add(RoutineProofPickerPackage())
+          add(FamilyLocationPackage())
         },
     )
   }
