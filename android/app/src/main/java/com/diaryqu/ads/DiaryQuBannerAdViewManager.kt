@@ -9,7 +9,7 @@ import com.facebook.react.uimanager.annotations.ReactProp
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 
-private class DiaryQuBannerContainer(context: Context) : FrameLayout(context) {
+class DiaryQuBannerContainer(context: Context) : FrameLayout(context) {
   private var adView: AdView? = null
 
   init {
