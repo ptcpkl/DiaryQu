@@ -1,7 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, View, type ViewStyle} from 'react-native';
 
-import {colors, spacing} from '../../constants/theme';
+import {spacing} from '../../constants/theme';
 import {AppText} from './AppText';
 
 interface SectionHeaderProps {
