@@ -5,8 +5,8 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
@@ -15,45 +15,146 @@ import type {
   MainTabParamList,
 } from '../../../app/navigation/types';
 import {BrandMark} from '../../../components/common/BrandMark';
-import {colors, radius, spacing} from '../../../constants/theme';
+import {
+  AppCard,
+  AppText,
+  Avatar,
+  Chip,
+  IconBadge,
+  SectionHeader,
+} from '../../../components/ui';
+import {
+  colors,
+  layout,
+  radius,
+  shadows,
+  spacing,
+} from '../../../constants/theme';
 import {useAuthStore} from '../../auth/store/authStore';
 import {useFamilyStore} from '../../family/store/familyStore';
+import {
+  formatHomeDate,
+  formatHomeTime,
+  getHomeGreeting,
+} from '../utils/homeDate';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
 
 type QuickMenu = {
   label: string;
+  helper: string;
   glyph: string;
+  tone: 'green' | 'blue' | 'yellow' | 'pink';
   target?: keyof MainTabParamList;
   appTarget?: keyof AppStackParamList;
 };
 
+type AgendaPreview = {
+  id: string;
+  dayLabel: string;
+  title: string;
+  time: string;
+  location: string;
+  category: string;
+};
+
+type FamilyProgress = {
+  id: string;
+  name: string;
+  score: number;
+  target: number;
+};
+
 const QUICK_MENU: QuickMenu[] = [
-  {label: 'Agenda', glyph: '▦', target: 'Agenda'},
-  {label: 'Rutinitas Hari Ini', glyph: '✓', target: 'Routines'},
-  {label: 'Goresan', glyph: '✎', appTarget: 'Goresan'},
-  {label: 'Keuangan', glyph: '▣', target: 'Finance'},
-  {label: 'AssetQu', glyph: '▤', target: 'Finance'},
-  {label: 'Kontribusi', glyph: '♥', appTarget: 'Contribution'},
+  {
+    label: 'Agenda',
+    helper: 'Jadwal keluarga',
+    glyph: '▦',
+    tone: 'blue',
+    target: 'Agenda',
+  },
+  {
+    label: 'Rutinitas Hari Ini',
+    helper: 'Cek tugas harian',
+    glyph: '✓',
+    tone: 'green',
+    target: 'Routines',
+  },
+  {
+    label: 'Goresan',
+    helper: 'Catatan keluarga',
+    glyph: '✎',
+    tone: 'yellow',
+    appTarget: 'Goresan',
+  },
+  {
+    label: 'Keuangan',
+    helper: 'UangQu',
+    glyph: '▣',
+    tone: 'green',
+    target: 'Finance',
+  },
+  {
+    label: 'AssetQu',
+    helper: 'Aset keluarga',
+    glyph: '▤',
+    tone: 'blue',
+    target: 'Finance',
+  },
+  {
+    label: 'Kontribusi',
+    helper: 'Berbagi kebaikan',
+    glyph: '♥',
+    tone: 'pink',
+    appTarget: 'Contribution',
+  },
 ];
 
-function getGreeting(hour: number): string {
-  if (hour < 11) {
-    return 'Selamat pagi';
-  }
-  if (hour < 15) {
-    return 'Selamat siang';
-  }
-  if (hour < 19) {
-    return 'Selamat sore';
-  }
-  return 'Selamat malam';
-}
+const AGENDA_PREVIEW: AgendaPreview[] = [
+  {
+    id: 'agenda-1',
+    dayLabel: 'Hari ini',
+    title: "Kajian Ba'da Maghrib",
+    time: '18.30 - 19.30',
+    location: 'Masjid dekat rumah',
+    category: 'Ibadah',
+  },
+  {
+    id: 'agenda-2',
+    dayLabel: 'Besok',
+    title: 'Belanja kebutuhan mingguan',
+    time: '09.00 - 10.30',
+    location: 'Pasar / supermarket',
+    category: 'Keluarga',
+  },
+];
+
+const FAMILY_PROGRESS: FamilyProgress[] = [
+  {id: 'member-head', name: 'Pak Dahlan', score: 8, target: 10},
+  {id: 'member-mom', name: 'Ibu', score: 7, target: 10},
+  {id: 'member-budi', name: 'Budi', score: 4, target: 10},
+  {id: 'member-siti', name: 'Siti', score: 6, target: 10},
+];
+
+const toneBackground: Record<QuickMenu['tone'], string> = {
+  green: colors.primarySoft,
+  blue: colors.infoSoft,
+  yellow: colors.warningSoft,
+  pink: '#FDECF2',
+};
+
+const toneForeground: Record<QuickMenu['tone'], string> = {
+  green: colors.primaryDark,
+  blue: colors.info,
+  yellow: colors.warningDark,
+  pink: '#C84B78',
+};
 
 export function HomeScreen({navigation}: Props) {
   const session = useAuthStore(state => state.session);
   const family = useFamilyStore(state => state.family);
   const [now, setNow] = useState(() => new Date());
+  const {width} = useWindowDimensions();
   const appNavigation = navigation.getParent<
     NativeStackNavigationProp<AppStackParamList>
   >();
@@ -72,24 +173,13 @@ export function HomeScreen({navigation}: Props) {
     ) {
       return metadata.full_name.trim();
     }
-    return session?.user.email?.split('@')[0] ?? 'Keluarga DiaryQu';
+    return session?.user.email?.split('@')[0] ?? 'Pak Dahlan';
   }, [session]);
 
+  const firstName = displayName.split(/\s+/)[0] || displayName;
   const roleLabel =
     family?.role === 'head' ? 'Kepala Keluarga' : 'Anggota Keluarga';
-
-  const formattedDate = new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(now);
-
-  const formattedTime = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(now);
+  const useTwoColumnMenu = width < 365;
 
   const openQuickMenu = (item: QuickMenu) => {
     if (item.target) {
@@ -107,124 +197,210 @@ export function HomeScreen({navigation}: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <View style={styles.topBar}>
           <BrandMark compact />
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Buka profil"
             onPress={() => appNavigation?.navigate('Profile')}
-            style={styles.identityRow}>
-            <View style={styles.identityText}>
-              <Text style={styles.userName} numberOfLines={1}>
+            style={({pressed}) => [
+              styles.identityButton,
+              pressed ? styles.pressed : undefined,
+            ]}>
+            <View style={styles.identityCopy}>
+              <AppText variant="bodyStrong" numberOfLines={1} align="right">
                 {displayName}
-              </Text>
-              <Text style={styles.userRole}>{roleLabel}</Text>
+              </AppText>
+              <AppText variant="micro" tone="muted" numberOfLines={1}>
+                {roleLabel}
+              </AppText>
             </View>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {displayName.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
+            <Avatar name={displayName} size="md" />
           </Pressable>
         </View>
 
-        <View style={styles.greetingCard}>
-          <Text style={styles.greetingTitle}>
-            {getGreeting(now.getHours())}, {displayName} 👋
-          </Text>
-          <View style={styles.greetingMetaRow}>
-            <Text style={styles.greetingMeta}>▣ {formattedDate}</Text>
-            <View style={styles.clockPill}>
-              <Text style={styles.clockText}>◷ {formattedTime}</Text>
+        <View style={styles.heroCard}>
+          <View style={styles.heroOrbLarge} />
+          <View style={styles.heroOrbSmall} />
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroCopy}>
+              <AppText variant="micro" tone="onPrimary" style={styles.heroKicker}>
+                {getHomeGreeting(now.getHours())}
+              </AppText>
+              <AppText variant="heading" tone="onPrimary">
+                Halo, {firstName}
+              </AppText>
+              <AppText variant="caption" tone="onPrimary" style={styles.heroSubtitle}>
+                Semoga hari ini penuh berkah dan semua aktivitas keluarga berjalan lancar.
+              </AppText>
+            </View>
+            <View style={styles.heroMonogram}>
+              <AppText variant="title" tone="onPrimary">
+                DQ
+              </AppText>
             </View>
           </View>
-          <View style={styles.locationPill}>
-            <Text style={styles.locationText}>⌖ Lokasi belum diaktifkan</Text>
+
+          <View style={styles.heroMetaRow}>
+            <View style={styles.heroMetaItem}>
+              <AppText variant="micro" tone="onPrimary" style={styles.heroMetaIcon}>
+                ◷
+              </AppText>
+              <View>
+                <AppText variant="micro" tone="onPrimary" style={styles.heroMetaLabel}>
+                  Waktu sekarang
+                </AppText>
+                <AppText variant="label" tone="onPrimary">
+                  {formatHomeTime(now)} WIB
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.heroMetaDivider} />
+            <View style={styles.heroMetaItem}>
+              <AppText variant="micro" tone="onPrimary" style={styles.heroMetaIcon}>
+                ▦
+              </AppText>
+              <View style={styles.heroMetaDateCopy}>
+                <AppText variant="micro" tone="onPrimary" style={styles.heroMetaLabel}>
+                  Hari ini
+                </AppText>
+                <AppText variant="label" tone="onPrimary" numberOfLines={1}>
+                  {formatHomeDate(now)}
+                </AppText>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.locationBar}>
+            <AppText variant="caption" tone="onPrimary">
+              ⌖ Bekasi, Jawa Barat
+            </AppText>
+            <AppText variant="micro" tone="onPrimary" style={styles.locationStatus}>
+              Lokasi demo
+            </AppText>
           </View>
         </View>
 
-        <View style={styles.adCard}>
-          <Text style={styles.adIcon}>⚐</Text>
-          <Text style={styles.adText}>Banner Iklan</Text>
-          <View style={styles.adBadge}>
-            <Text style={styles.adBadgeText}>Ad</Text>
+        <View style={styles.adBanner} accessibilityLabel="Area iklan">
+          <View style={styles.adIconBox}>
+            <AppText variant="section" tone="secondary">
+              ▱
+            </AppText>
           </View>
+          <View style={styles.adCopy}>
+            <AppText variant="bodyStrong" tone="secondary">
+              Banner Iklan
+            </AppText>
+            <AppText variant="micro" tone="muted">
+              Area monetisasi akan diaktifkan setelah integrasi Ads SDK.
+            </AppText>
+          </View>
+          <Chip label="Ad" size="sm" tone="neutral" />
         </View>
 
-        <View style={styles.quoteCard}>
-          <View style={styles.quoteTitleRow}>
-            <View style={styles.quoteBubble}>
-              <Text style={styles.quoteBubbleText}>“</Text>
+        <View style={styles.inspirationCard}>
+          <View style={styles.inspirationHeader}>
+            <IconBadge glyph="“" tone="primary" size="md" />
+            <View style={styles.flexOne}>
+              <AppText variant="section" tone="primary">
+                Inspirasi Hari Ini
+              </AppText>
+              <AppText variant="micro" tone="muted">
+                Pengingat kecil untuk keluarga
+              </AppText>
             </View>
-            <Text style={styles.quoteTitle}>Inspirasi Hari Ini</Text>
           </View>
-          <Text style={styles.quoteText}>
+          <AppText variant="body" tone="primary" style={styles.quoteText}>
             “Sesungguhnya bersama kesulitan ada kemudahan.”
-          </Text>
-          <Text style={styles.quoteSource}>– QS. Al-Insyirah: 6</Text>
+          </AppText>
+          <AppText variant="label" tone="primary">
+            QS. Al-Insyirah: 6
+          </AppText>
         </View>
 
-        <SectionHeader
-          title="Agenda Hari Ini & Esok"
-          action="Lihat semua"
-          onAction={() => navigation.navigate('Agenda')}
-        />
-        <View style={styles.emptyCard}>
-          <View style={styles.emptyIcon}>
-            <Text style={styles.emptyIconText}>▦</Text>
+        <View style={styles.sectionBlock}>
+          <SectionHeader
+            title="Agenda Hari Ini & Esok"
+            subtitle="Dua jadwal terdekat keluarga"
+            actionLabel="Lihat semua"
+            onAction={() => navigation.navigate('Agenda')}
+          />
+          <View style={styles.agendaList}>
+            {AGENDA_PREVIEW.map(item => (
+              <AgendaPreviewCard key={item.id} item={item} />
+            ))}
           </View>
-          <View style={styles.flexOne}>
-            <Text style={styles.emptyTitle}>Belum ada agenda terdekat</Text>
-            <Text style={styles.emptyCaption}>
-              Agenda hari ini dan esok akan tampil di sini.
-            </Text>
-          </View>
         </View>
 
-        <SectionHeader title="Statistik Keluarga" action="Hari ini" />
-        <View style={styles.statsEmptyCard}>
-          <Text style={styles.statsEmptyTitle}>
-            {family?.name ?? 'Family Room DiaryQu'}
-          </Text>
-          <Text style={styles.statsEmptyText}>
-            Progress anggota akan muncul setelah modul Rutinitas terhubung
-            dengan database.
-          </Text>
+        <View style={styles.sectionBlock}>
+          <SectionHeader
+            title="Statistik Keluarga"
+            subtitle="Progress rutinitas hari ini"
+            actionLabel="Rutinitas"
+            onAction={() => navigation.navigate('Routines')}
+          />
+          <AppCard elevated padding="lg" style={styles.familyStatsCard}>
+            <View style={styles.familyStatsHeader}>
+              <View>
+                <AppText variant="bodyStrong" tone="primary">
+                  {family?.name ?? 'Keluarga Pak Dahlan'}
+                </AppText>
+                <AppText variant="micro" tone="muted">
+                  4 anggota aktif
+                </AppText>
+              </View>
+              <View style={styles.scoreBadge}>
+                <AppText variant="label" tone="primary">
+                  25/40
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.progressList}>
+              {FAMILY_PROGRESS.map(member => (
+                <FamilyProgressRow key={member.id} member={member} />
+              ))}
+            </View>
+          </AppCard>
         </View>
 
-        <Text style={styles.sectionTitleGreen}>Lihat Menu</Text>
-        <View style={styles.quickGrid}>
-          {QUICK_MENU.map(item => {
-            const enabled = Boolean(item.target || item.appTarget);
-            return (
-              <Pressable
+        <View style={styles.sectionBlock}>
+          <SectionHeader
+            title="Lihat Menu"
+            subtitle="Akses cepat fitur DiaryQu"
+          />
+          <View style={styles.quickGrid}>
+            {QUICK_MENU.map(item => (
+              <QuickMenuTile
                 key={item.label}
-                disabled={!enabled}
+                item={item}
+                twoColumns={useTwoColumnMenu}
                 onPress={() => openQuickMenu(item)}
-                style={({pressed}) => [
-                  styles.quickCard,
-                  pressed && styles.quickCardPressed,
-                  !enabled && styles.quickCardDisabled,
-                ]}>
-                <View style={styles.quickIconCircle}>
-                  <Text style={styles.quickGlyph}>{item.glyph}</Text>
-                </View>
-                <Text style={styles.quickLabel}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
+              />
+            ))}
+          </View>
         </View>
 
-        <View style={styles.familyCard}>
-          <View style={styles.familyIllustration}>
-            <Text style={styles.familyIllustrationText}>☺</Text>
+        <View style={styles.familyRoomCard}>
+          <View style={styles.familyRoomAccent} />
+          <View style={styles.familyRoomIllustration}>
+            <View style={styles.familyHead} />
+            <View style={[styles.familyHead, styles.familyHeadSmall]} />
+            <View style={styles.familyBodyShape} />
           </View>
-          <View style={styles.familyBody}>
-            <Text style={styles.familyTitle}>
-              {family?.name ?? 'Family Room DiaryQu'}
-            </Text>
+          <View style={styles.familyRoomCopy}>
+            <AppText variant="micro" tone="onPrimary" style={styles.familyRoomKicker}>
+              FAMILY ROOM
+            </AppText>
+            <AppText variant="section" tone="onPrimary">
+              {family?.name ?? 'Keluarga Pak Dahlan'}
+            </AppText>
+            <AppText variant="caption" tone="onPrimary" style={styles.familyRoomDescription}>
+              Bagikan kode ini hanya kepada anggota keluarga yang ingin bergabung.
+            </AppText>
             <View style={styles.familyCodePill}>
-              <Text style={styles.familyCodeText}>
-                Family Code: {family?.familyCode ?? '—'}
-              </Text>
+              <AppText variant="label" tone="onPrimary">
+                Family Code: {family?.familyCode ?? 'DQ-7K4P9X'}
+              </AppText>
             </View>
           </View>
         </View>
@@ -233,266 +409,382 @@ export function HomeScreen({navigation}: Props) {
   );
 }
 
-interface SectionHeaderProps {
-  title: string;
-  action?: string;
-  onAction?: () => void;
+function AgendaPreviewCard({item}: {item: AgendaPreview}) {
+  return (
+    <AppCard elevated padding="md" style={styles.agendaCard}>
+      <View style={styles.agendaTopRow}>
+        <View style={styles.agendaDayPill}>
+          <AppText variant="micro" tone="primary">
+            {item.dayLabel}
+          </AppText>
+        </View>
+        <Chip label={item.category} size="sm" tone="success" />
+      </View>
+      <AppText variant="bodyStrong" style={styles.agendaTitle}>
+        {item.title}
+      </AppText>
+      <View style={styles.agendaMetaRow}>
+        <AppText variant="caption" tone="muted">
+          ◷ {item.time}
+        </AppText>
+        <View style={styles.agendaMetaDot} />
+        <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.flexOne}>
+          ⌖ {item.location}
+        </AppText>
+      </View>
+    </AppCard>
+  );
 }
 
-function SectionHeader({title, action, onAction}: SectionHeaderProps) {
+function FamilyProgressRow({member}: {member: FamilyProgress}) {
+  const progress = Math.min(100, Math.round((member.score / member.target) * 100));
+
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {action ? (
-        <Pressable disabled={!onAction} onPress={onAction}>
-          <Text style={styles.sectionAction}>{action}</Text>
-        </Pressable>
-      ) : null}
+    <View style={styles.progressRow}>
+      <Avatar name={member.name} size="sm" bordered={false} />
+      <View style={styles.progressCopy}>
+        <View style={styles.progressLabelRow}>
+          <AppText variant="caption">{member.name}</AppText>
+          <AppText variant="micro" tone="muted">
+            {member.score}/{member.target}
+          </AppText>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, {width: `${progress}%`}]} />
+        </View>
+      </View>
     </View>
+  );
+}
+
+function QuickMenuTile({
+  item,
+  twoColumns,
+  onPress,
+}: {
+  item: QuickMenu;
+  twoColumns: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.quickTile,
+        twoColumns ? styles.quickTileTwoColumns : styles.quickTileThreeColumns,
+        pressed ? styles.quickTilePressed : undefined,
+      ]}>
+      <View
+        style={[
+          styles.quickIcon,
+          {backgroundColor: toneBackground[item.tone]},
+        ]}>
+        <AppText
+          variant="section"
+          style={{color: toneForeground[item.tone]}}>
+          {item.glyph}
+        </AppText>
+      </View>
+      <AppText variant="label" align="center" numberOfLines={2}>
+        {item.label}
+      </AppText>
+      <AppText variant="micro" tone="muted" align="center" numberOfLines={1}>
+        {item.helper}
+      </AppText>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: colors.background},
-  content: {padding: spacing.xl, paddingBottom: 120, gap: spacing.lg},
+  content: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.lg,
+    paddingBottom: 120,
+    gap: spacing.xl,
+  },
   flexOne: {flex: 1},
-  header: {
+  pressed: {opacity: 0.72},
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 48,
   },
-  identityRow: {
+  identityButton: {
+    maxWidth: '62%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    maxWidth: '58%',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingLeft: spacing.sm,
   },
-  identityText: {alignItems: 'flex-end', flexShrink: 1},
-  userName: {fontSize: 15, fontWeight: '800', color: '#111111'},
-  userRole: {fontSize: 12, color: '#4D5854', marginTop: 1},
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+  identityCopy: {alignItems: 'flex-end', flexShrink: 1},
+  heroCard: {
+    minHeight: 242,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primaryStrong,
+    padding: spacing.xl,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  heroOrbLarge: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    right: -56,
+    top: -62,
+  },
+  heroOrbSmall: {
+    position: 'absolute',
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    left: -28,
+    bottom: -24,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+  },
+  heroCopy: {flex: 1},
+  heroKicker: {opacity: 0.82, marginBottom: spacing.xs},
+  heroSubtitle: {opacity: 0.88, marginTop: spacing.sm, maxWidth: 270},
+  heroMonogram: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.34)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {color: colors.primaryDark, fontWeight: '800', fontSize: 16},
-  greetingCard: {
-    backgroundColor: '#2CA67C',
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    gap: 11,
-    overflow: 'hidden',
+  heroMetaRow: {
+    marginTop: spacing.xl,
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.11)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
   },
-  greetingTitle: {fontSize: 21, fontWeight: '800', color: '#FFFFFF'},
-  greetingMetaRow: {
+  heroMetaItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  heroMetaDateCopy: {flex: 1},
+  heroMetaIcon: {fontSize: 18, opacity: 0.92},
+  heroMetaLabel: {opacity: 0.66},
+  heroMetaDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    marginHorizontal: spacing.sm,
+  },
+  locationBar: {
+    marginTop: spacing.md,
+    minHeight: 38,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  greetingMeta: {color: '#E7FFF5', fontSize: 11, flex: 1},
-  clockPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  clockText: {color: '#FFFFFF', fontSize: 11, fontWeight: '600'},
-  locationPill: {
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  locationText: {color: '#FFFFFF', fontSize: 12},
-  adCard: {
-    height: 94,
+  locationStatus: {opacity: 0.68},
+  adBanner: {
+    minHeight: 82,
     borderRadius: radius.md,
     backgroundColor: colors.ad,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  adIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.54)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  adIcon: {fontSize: 20, opacity: 0.45},
-  adText: {fontSize: 14, color: '#44505C', marginTop: 3},
-  adBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(21,32,51,0.08)',
-  },
-  adBadgeText: {fontSize: 10, color: '#4F5963'},
-  quoteCard: {
-    borderWidth: 1.2,
-    borderColor: colors.primary,
-    backgroundColor: '#ECFFF7',
+  adCopy: {flex: 1, gap: spacing.xxs},
+  inspirationCard: {
     borderRadius: radius.lg,
-    padding: spacing.xxl,
-    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+    backgroundColor: '#ECFFF7',
+    padding: spacing.xl,
+    gap: spacing.md,
   },
-  quoteTitleRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
-  quoteBubble: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.primary,
+  inspirationHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.md,
   },
-  quoteBubbleText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: -2,
-  },
-  quoteTitle: {color: colors.primary, fontWeight: '800', fontSize: 16},
-  quoteText: {
-    color: colors.primaryDark,
-    fontSize: 14,
-    fontStyle: 'italic',
-    lineHeight: 22,
-  },
-  quoteSource: {color: colors.primaryDark, fontSize: 12, fontWeight: '600'},
-  sectionHeader: {
+  quoteText: {fontStyle: 'italic'},
+  sectionBlock: {gap: spacing.md},
+  agendaList: {gap: spacing.md},
+  agendaCard: {gap: spacing.sm},
+  agendaTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
   },
-  sectionTitle: {fontSize: 16, fontWeight: '800', color: colors.text},
-  sectionAction: {fontSize: 12, color: colors.primaryDark, fontWeight: '700'},
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.lg,
+  agendaDayPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  agendaTitle: {marginTop: spacing.xxs},
+  agendaMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 2,
+    gap: spacing.sm,
   },
-  emptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.blueSoft,
+  agendaMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.borderStrong,
+  },
+  familyStatsCard: {gap: spacing.lg},
+  familyStatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scoreBadge: {
+    minWidth: 58,
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
-  emptyIconText: {color: colors.primaryDark, fontSize: 22, fontWeight: '800'},
-  emptyTitle: {fontSize: 14, color: colors.text, fontWeight: '700'},
-  emptyCaption: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 3,
-    lineHeight: 17,
+  progressList: {gap: spacing.md},
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  statsEmptyCard: {
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 2,
+  progressCopy: {flex: 1, gap: spacing.xs},
+  progressLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  statsEmptyTitle: {color: colors.primaryDark, fontWeight: '800', fontSize: 14},
-  statsEmptyText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
+  progressTrack: {
+    height: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    overflow: 'hidden',
   },
-  sectionTitleGreen: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#25966E',
-    marginTop: 4,
+  progressFill: {
+    height: '100%',
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
   },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 12,
+    rowGap: spacing.md,
   },
-  quickCard: {
-    width: '31.7%',
-    minHeight: 112,
+  quickTile: {
+    minHeight: 128,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+    ...shadows.sm,
   },
-  quickCardPressed: {transform: [{scale: 0.98}]},
-  quickCardDisabled: {opacity: 0.72},
-  quickIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.blueSoft,
+  quickTileThreeColumns: {width: '31.5%'},
+  quickTileTwoColumns: {width: '48.3%'},
+  quickTilePressed: {
+    opacity: 0.78,
+    transform: [{scale: 0.98}],
+  },
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 9,
+    marginBottom: spacing.xs,
   },
-  quickGlyph: {color: '#27A579', fontWeight: '900', fontSize: 20},
-  quickLabel: {
-    textAlign: 'center',
-    color: colors.text,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  familyCard: {
-    height: 128,
-    borderRadius: radius.md,
-    backgroundColor: '#28A477',
+  familyRoomCard: {
+    minHeight: 154,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryStrong,
     flexDirection: 'row',
-    overflow: 'hidden',
-    alignItems: 'flex-end',
-    paddingHorizontal: 14,
-  },
-  familyIllustration: {
-    width: 104,
-    height: 104,
-    borderTopLeftRadius: 52,
-    borderTopRightRadius: 52,
-    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingRight: spacing.lg,
+    ...shadows.md,
   },
-  familyIllustrationText: {fontSize: 58, color: '#FFFFFF'},
-  familyBody: {flex: 1, paddingLeft: 10, paddingBottom: 22},
-  familyTitle: {color: '#FFFFFF', fontSize: 15, fontWeight: '800'},
+  familyRoomAccent: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    left: -74,
+    bottom: -70,
+  },
+  familyRoomIllustration: {
+    width: 110,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: spacing.lg,
+  },
+  familyHead: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    position: 'absolute',
+    top: 40,
+    left: 32,
+  },
+  familyHeadSmall: {width: 22, height: 22, borderRadius: 11, left: 59, top: 48},
+  familyBodyShape: {
+    width: 66,
+    height: 48,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  familyRoomCopy: {flex: 1, paddingVertical: spacing.xl},
+  familyRoomKicker: {opacity: 0.62, letterSpacing: 1.2},
+  familyRoomDescription: {opacity: 0.82, marginTop: spacing.xs},
   familyCodePill: {
-    marginTop: 10,
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+    minHeight: 34,
     borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(255,255,255,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  familyCodeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    textAlign: 'center',
-    fontWeight: '700',
+    borderColor: 'rgba(255,255,255,0.34)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
 });
