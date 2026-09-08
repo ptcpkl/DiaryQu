@@ -32,6 +32,6 @@ export interface NativeLocationPosition {
   recordedAt: string;
 }
 
-export interface LocationShareInput extends NativeLocationPosition {}
+export type LocationShareInput = NativeLocationPosition;
 
 export type LocationFreshness = 'live' | 'recent' | 'stale' | 'hidden';
