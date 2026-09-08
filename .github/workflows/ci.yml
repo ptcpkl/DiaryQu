@@ -9,7 +9,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -43,4 +43,4 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :app:compileDebugKotlin --no-daemon
+          ./gradlew :app:compileDebugKotlin :app:compileReleaseKotlin --no-daemon
