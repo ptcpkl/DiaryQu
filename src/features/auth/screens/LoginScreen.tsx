@@ -1,13 +1,18 @@
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
+import type {AuthStackParamList} from '../../../app/navigation/types';
 import {BrandMark} from '../../../components/common/BrandMark';
 import {AppButton, AppText, TextField} from '../../../components/ui';
 import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
@@ -16,11 +21,14 @@ import {isSupabaseConfigured} from '../../../lib/supabase/client';
 import {useAuthStore} from '../store/authStore';
 import {validateLogin, type LoginValidationResult} from '../utils/validation';
 
-export function LoginScreen() {
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+
+export function LoginScreen({navigation}: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validation, setValidation] = useState<LoginValidationResult>({});
   const signIn = useAuthStore(state => state.signIn);
+  const beginGoogleSignIn = useAuthStore(state => state.beginGoogleSignIn);
   const isSubmitting = useAuthStore(state => state.isSubmitting);
   const authError = useAuthStore(state => state.error);
   const clearError = useAuthStore(state => state.clearError);
@@ -44,6 +52,21 @@ export function LoginScreen() {
     }
 
     await signIn({email: email.trim(), password});
+  };
+
+  const handleGoogle = async () => {
+    clearError();
+    const url = await beginGoogleSignIn();
+    if (!url) return;
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(
+        'Browser tidak dapat dibuka',
+        'Coba lagi atau gunakan login email dan password.',
+      );
+    }
   };
 
   return (
@@ -116,14 +139,14 @@ export function LoginScreen() {
               {!FRONTEND_DEMO_MODE && !isSupabaseConfigured ? (
                 <View style={styles.configHint}>
                   <AppText variant="micro" tone="muted">
-                    Backend Supabase belum terhubung. UI siap, autentikasi akan aktif
-                    setelah environment project diisi.
+                    Backend Supabase belum terhubung. Isi konfigurasi project sebelum
+                    autentikasi production digunakan.
                   </AppText>
                 </View>
               ) : null}
 
               <AppButton
-                label="Log In"
+                label={FRONTEND_DEMO_MODE ? 'Masuk Demo' : 'Log In'}
                 size="md"
                 loading={isSubmitting}
                 onPress={handleSubmit}
@@ -142,13 +165,24 @@ export function LoginScreen() {
                 label="Login dengan akun Google"
                 variant="outline"
                 size="lg"
-                disabled
+                loading={isSubmitting}
+                onPress={handleGoogle}
                 leftIcon={
                   <AppText variant="section" style={styles.googleIcon}>
                     G
                   </AppText>
                 }
               />
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Buat akun baru"
+                onPress={() => navigation.navigate('Register')}
+                style={styles.registerLink}>
+                <AppText variant="bodySmall" tone="secondary" align="center">
+                  Belum punya akun? <AppText variant="bodyStrong" tone="primary">Daftar</AppText>
+                </AppText>
+              </Pressable>
             </View>
           </View>
         </ScrollView>
@@ -208,4 +242,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.borderStrong,
   },
   googleIcon: {fontWeight: '900', color: '#4285F4', fontSize: 18},
+  registerLink: {paddingVertical: spacing.md},
 });
