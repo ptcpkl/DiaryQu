@@ -10,36 +10,91 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {BrandMark} from '../../../components/common/BrandMark';
-import {colors, radius, spacing} from '../../../constants/theme';
+import {
+  AppButton,
+  AppCard,
+  AppText,
+  Avatar,
+  Chip,
+  FloatingActionButton,
+  IconBadge,
+  ScreenHeader,
+  SectionHeader,
+  TextField,
+} from '../../../components/ui';
+import {
+  colors,
+  layout,
+  radius,
+  shadows,
+  spacing,
+} from '../../../constants/theme';
 import {useAuthStore} from '../../auth/store/authStore';
 import {useFamilyStore} from '../../family/store/familyStore';
 import {agendaReminderService} from '../services/agendaReminderService';
 import {useAgendaStore} from '../store/agendaStore';
-import type {AgendaDraft, AgendaEntry, AgendaStatus} from '../types';
+import type {
+  AgendaCategory,
+  AgendaDraft,
+  AgendaEntry,
+  AgendaStatus,
+} from '../types';
 import {
   calendarCells,
-  combineLocalDateAndTime,
   dateKey,
   formatShortDate,
   formatTime,
   monthRange,
 } from '../utils/date';
+import {
+  REMINDER_OPTIONS,
+  agendaEditorInitialState,
+  buildAgendaDraft,
+  type AgendaEditorValues,
+} from '../utils/editor';
 
 const WEEKDAYS = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
-const REMINDER_OPTIONS = [0, 5, 10, 30, 60];
 
-const STATUS_META: Record<AgendaStatus, {label: string; glyph: string}> = {
-  scheduled: {label: 'Terjadwal', glyph: '●'},
-  postponed: {label: 'Ditunda', glyph: 'Ⅱ'},
-  completed: {label: 'Selesai', glyph: '✓'},
+const STATUS_META: Record<
+  AgendaStatus,
+  {label: string; tone: 'primary' | 'warning' | 'success'; glyph: string}
+> = {
+  scheduled: {label: 'Terjadwal', tone: 'primary', glyph: '•'},
+  postponed: {label: 'Ditunda', tone: 'warning', glyph: 'Ⅱ'},
+  completed: {label: 'Selesai', tone: 'success', glyph: '✓'},
 };
+
+const CATEGORY_META: Record<
+  AgendaCategory,
+  {label: string; tone: 'primary' | 'warning' | 'success'; glyph: string}
+> = {
+  work: {label: 'Kerja', tone: 'primary', glyph: '▣'},
+  business: {label: 'Bisnis', tone: 'warning', glyph: '◇'},
+  islamic: {label: 'Islami', tone: 'success', glyph: '☾'},
+};
+
+const CATEGORY_OPTIONS = Object.keys(CATEGORY_META) as AgendaCategory[];
+const STATUS_OPTIONS = Object.keys(STATUS_META) as AgendaStatus[];
+
+function displayNameFromSession(
+  session: ReturnType<typeof useAuthStore.getState>['session'],
+): string {
+  const metadata = session?.user.user_metadata;
+  if (
+    metadata &&
+    typeof metadata.full_name === 'string' &&
+    metadata.full_name.trim()
+  ) {
+    return metadata.full_name.trim();
+  }
+  return session?.user.email?.split('@')[0] ?? 'DiaryQu';
+}
 
 export function AgendaScreen() {
   const family = useFamilyStore(state => state.family);
@@ -65,21 +120,31 @@ export function AgendaScreen() {
   const [editorEntry, setEditorEntry] = useState<AgendaEntry | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
+  const familyId = family?.id ?? null;
+  const userId = session?.user.id ?? null;
   const range = useMemo(() => monthRange(visibleMonth), [visibleMonth]);
   const cells = useMemo(() => calendarCells(visibleMonth), [visibleMonth]);
   const selectedKey = dateKey(selectedDate);
-  const eventDateKeys = useMemo(
-    () => new Set(items.map(item => dateKey(new Date(item.startsAt)))),
-    [items],
-  );
+  const todayKey = dateKey(new Date());
+  const displayName = displayNameFromSession(session);
+
+  const eventCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    items.forEach(item => {
+      const key = dateKey(new Date(item.startsAt));
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return counts;
+  }, [items]);
+
   const selectedItems = useMemo(
     () =>
       items.filter(item => dateKey(new Date(item.startsAt)) === selectedKey),
     [items, selectedKey],
   );
 
-  const familyId = family?.id ?? null;
-  const userId = session?.user.id ?? null;
+  const activeMonthCount = items.filter(item => item.status !== 'completed').length;
+  const reminderCount = items.filter(item => item.reminderEnabled).length;
 
   useFocusEffect(
     useCallback(() => {
@@ -87,7 +152,13 @@ export function AgendaScreen() {
         loadRange(familyId, range.startIso, range.endIso).catch(() => undefined);
       }
       refreshExactAlarmStatus().catch(() => undefined);
-    }, [familyId, loadRange, range.endIso, range.startIso, refreshExactAlarmStatus]),
+    }, [
+      familyId,
+      loadRange,
+      range.endIso,
+      range.startIso,
+      refreshExactAlarmStatus,
+    ]),
   );
 
   const changeMonth = (delta: number) => {
@@ -101,6 +172,13 @@ export function AgendaScreen() {
     clearError();
   };
 
+  const goToday = () => {
+    const today = new Date();
+    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDate(today);
+    clearError();
+  };
+
   const openCreate = () => {
     setEditorEntry(null);
     setEditorOpen(true);
@@ -109,9 +187,11 @@ export function AgendaScreen() {
 
   const openEdit = (entry: AgendaEntry) => {
     setEditorEntry(entry);
-    const date = new Date(entry.startsAt);
-    setSelectedDate(date);
-    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    const entryDate = new Date(entry.startsAt);
+    setSelectedDate(entryDate);
+    setVisibleMonth(
+      new Date(entryDate.getFullYear(), entryDate.getMonth(), 1),
+    );
     setEditorOpen(true);
     clearError();
   };
@@ -172,71 +252,122 @@ export function AgendaScreen() {
     year: 'numeric',
   }).format(visibleMonth);
 
+  const selectedDateLabel = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(selectedDate);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <View style={styles.topBar}>
           <BrandMark compact />
-          <View style={styles.headerIdentity}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {session?.user.user_metadata?.full_name ||
-                session?.user.email?.split('@')[0] ||
-                'DiaryQu'}
-            </Text>
-            <Text style={styles.headerRole}>
-              {family?.role === 'head' ? 'Kepala Keluarga' : 'Anggota Keluarga'}
-            </Text>
+          <View style={styles.identityRow}>
+            <View style={styles.identityCopy}>
+              <AppText variant="bodyStrong" numberOfLines={1} align="right">
+                {displayName}
+              </AppText>
+              <AppText variant="micro" tone="muted" align="right">
+                {family?.role === 'head'
+                  ? 'Kepala Keluarga'
+                  : 'Anggota Keluarga'}
+              </AppText>
+            </View>
+            <Avatar name={displayName} size="md" />
           </View>
         </View>
 
-        <View style={styles.hero}>
-          <View>
-            <Text style={styles.heroTitle}>Agenda</Text>
-            <Text style={styles.heroSubtitle}>Atur jadwal Anda di sini</Text>
-          </View>
-          <View style={styles.heroIllustration}>
-            <Text style={styles.heroGlyph}>▦</Text>
-          </View>
+        <ScreenHeader
+          variant="primary"
+          title="Agenda"
+          subtitle="Susun jadwal keluarga dan dapatkan pengingat tepat waktu."
+          right={
+            <View style={styles.heroIcon}>
+              <AppText variant="heading" tone="onPrimary">
+                ▦
+              </AppText>
+            </View>
+          }
+        />
+
+        <View style={styles.summaryRow}>
+          <SummaryCard
+            glyph="▦"
+            label="Aktif bulan ini"
+            value={String(activeMonthCount)}
+          />
+          <SummaryCard
+            glyph="◉"
+            label="Reminder aktif"
+            value={String(reminderCount)}
+          />
         </View>
 
         {reminderIsExact === false ? (
           <View style={styles.permissionCard}>
-            <View style={styles.permissionTextWrap}>
-              <Text style={styles.permissionTitle}>Alarm presisi belum aktif</Text>
-              <Text style={styles.permissionText}>
-                Reminder tetap dijadwalkan Android, tetapi waktunya dapat sedikit bergeser.
-              </Text>
+            <IconBadge glyph="!" tone="warning" size="sm" />
+            <View style={styles.permissionCopy}>
+              <AppText variant="bodyStrong" tone="warning">
+                Alarm presisi belum aktif
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                Reminder tetap berjalan, tetapi Android dapat sedikit menggeser
+                waktunya.
+              </AppText>
             </View>
-            <Pressable
+            <AppButton
+              label="Aktifkan"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               onPress={() => {
                 agendaReminderService
                   .openExactAlarmSettings()
                   .catch(() => undefined);
               }}
-              style={styles.permissionButton}>
-              <Text style={styles.permissionButtonText}>Aktifkan</Text>
-            </Pressable>
+            />
           </View>
         ) : null}
 
-        <View style={styles.calendarCard}>
-          <View style={styles.monthHeader}>
-            <Pressable onPress={() => changeMonth(-1)} style={styles.monthArrow}>
-              <Text style={styles.monthArrowText}>‹</Text>
-            </Pressable>
-            <Text style={styles.monthTitle}>{monthLabel}</Text>
-            <Pressable onPress={() => changeMonth(1)} style={styles.monthArrow}>
-              <Text style={styles.monthArrowText}>›</Text>
-            </Pressable>
+        <AppCard elevated padding="lg" style={styles.calendarCard}>
+          <View style={styles.calendarTitleRow}>
+            <View>
+              <AppText variant="section" style={styles.monthLabel}>
+                {monthLabel}
+              </AppText>
+              <AppText variant="micro" tone="muted">
+                Pilih tanggal untuk melihat jadwal
+              </AppText>
+            </View>
+            <AppButton
+              label="Hari ini"
+              variant="secondary"
+              size="sm"
+              fullWidth={false}
+              onPress={goToday}
+            />
+          </View>
+
+          <View style={styles.monthNavigation}>
+            <MonthArrow label="‹" onPress={() => changeMonth(-1)} />
+            <View style={styles.monthNavigationLine} />
+            <MonthArrow label="›" onPress={() => changeMonth(1)} />
           </View>
 
           <View style={styles.weekHeader}>
             {WEEKDAYS.map(day => (
-              <Text key={day} style={styles.weekday}>
+              <AppText
+                key={day}
+                variant="micro"
+                tone="subtle"
+                align="center"
+                style={styles.weekday}>
                 {day}
-              </Text>
+              </AppText>
             ))}
           </View>
 
@@ -248,98 +379,132 @@ export function AgendaScreen() {
 
               const key = dateKey(date);
               const selected = key === selectedKey;
-              const today = key === dateKey(new Date());
-              const hasEvent = eventDateKeys.has(key);
+              const today = key === todayKey;
+              const count = eventCounts.get(key) ?? 0;
 
               return (
                 <Pressable
                   key={key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tanggal ${date.getDate()}, ${count} agenda`}
+                  accessibilityState={{selected}}
                   onPress={() => setSelectedDate(date)}
-                  style={[
+                  style={({pressed}) => [
                     styles.dayCell,
-                    selected && styles.dayCellSelected,
-                    today && !selected && styles.dayCellToday,
+                    selected ? styles.dayCellSelected : undefined,
+                    today && !selected ? styles.dayCellToday : undefined,
+                    pressed ? styles.dayCellPressed : undefined,
                   ]}>
-                  <Text
-                    style={[
-                      styles.dayText,
-                      selected && styles.dayTextSelected,
-                    ]}>
+                  <AppText
+                    variant={selected ? 'bodyStrong' : 'bodySmall'}
+                    tone={selected ? 'onPrimary' : 'default'}>
                     {date.getDate()}
-                  </Text>
-                  {hasEvent ? (
-                    <View
-                      style={[
-                        styles.eventDot,
-                        selected && styles.eventDotSelected,
-                      ]}
-                    />
+                  </AppText>
+                  {count > 0 ? (
+                    <View style={styles.dayEventRow}>
+                      <View
+                        style={[
+                          styles.eventDot,
+                          selected ? styles.eventDotSelected : undefined,
+                        ]}
+                      />
+                      {count > 1 ? (
+                        <AppText
+                          variant="micro"
+                          tone={selected ? 'onPrimary' : 'primary'}>
+                          {count}
+                        </AppText>
+                      ) : null}
+                    </View>
                   ) : null}
                 </Pressable>
               );
             })}
           </View>
-        </View>
+        </AppCard>
 
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Jadwal</Text>
-            <Text style={styles.sectionSubtitle}>
-              {new Intl.DateTimeFormat('id-ID', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              }).format(selectedDate)}
-            </Text>
-          </View>
-          <Pressable onPress={openCreate} style={styles.addSmallButton}>
-            <Text style={styles.addSmallButtonText}>+ Tambah</Text>
-          </Pressable>
-        </View>
+        <View style={styles.sectionBlock}>
+          <SectionHeader
+            title="Jadwal"
+            subtitle={selectedDateLabel}
+            actionLabel="+ Tambah"
+            onAction={openCreate}
+          />
 
-        {error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={clearError}>
-              <Text style={styles.errorAction}>Tutup</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {isLoading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.loadingText}>Memuat agenda...</Text>
-          </View>
-        ) : selectedItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyGlyph}>▦</Text>
+          {error ? (
+            <View style={styles.errorCard}>
+              <IconBadge glyph="!" tone="danger" size="sm" />
+              <AppText variant="caption" tone="danger" style={styles.flexOne}>
+                {error}
+              </AppText>
+              <AppButton
+                label="Tutup"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={clearError}
+              />
             </View>
-            <Text style={styles.emptyTitle}>Belum ada agenda</Text>
-            <Text style={styles.emptyText}>
-              Tambahkan jadwal dan DiaryQu akan mengingatkan Anda pada waktunya.
-            </Text>
-            <Pressable onPress={openCreate} style={styles.emptyButton}>
-              <Text style={styles.emptyButtonText}>Buat Agenda</Text>
-            </Pressable>
+          ) : null}
+
+          {isLoading ? (
+            <AppCard padding="lg" style={styles.loadingCard}>
+              <ActivityIndicator color={colors.primary} />
+              <AppText variant="caption" tone="muted">
+                Memuat agenda...
+              </AppText>
+            </AppCard>
+          ) : selectedItems.length === 0 ? (
+            <AppCard elevated padding="lg" style={styles.emptyCard}>
+              <IconBadge glyph="▦" tone="primary" size="lg" />
+              <AppText variant="section" align="center">
+                Belum ada agenda
+              </AppText>
+              <AppText variant="caption" tone="muted" align="center">
+                Tambahkan jadwal untuk tanggal ini. Agenda hanya berfungsi
+                sebagai pengingat dan tidak membutuhkan bukti atau persetujuan.
+              </AppText>
+              <AppButton
+                label="Buat Agenda"
+                size="md"
+                onPress={openCreate}
+                style={styles.emptyButton}
+              />
+            </AppCard>
+          ) : (
+            <View style={styles.agendaList}>
+              {selectedItems.map(entry => (
+                <AgendaCard
+                  key={entry.id}
+                  entry={entry}
+                  canManage={canManage(entry)}
+                  onEdit={() => openEdit(entry)}
+                  onDelete={() => confirmDelete(entry)}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.reminderInfoCard}>
+          <IconBadge glyph="◉" tone="info" size="sm" />
+          <View style={styles.flexOne}>
+            <AppText variant="bodyStrong">Pengingat Agenda</AppText>
+            <AppText variant="caption" tone="muted">
+              Notifikasi dibuat langsung di perangkat. Kamu bisa menunda 5
+              menit atau menutup reminder dari notifikasi Android.
+            </AppText>
           </View>
-        ) : (
-          selectedItems.map(entry => (
-            <AgendaCard
-              key={entry.id}
-              entry={entry}
-              canManage={canManage(entry)}
-              onEdit={() => openEdit(entry)}
-              onDelete={() => confirmDelete(entry)}
-            />
-          ))
-        )}
+        </View>
       </ScrollView>
 
-      <Pressable onPress={openCreate} style={styles.fab}>
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
+      <FloatingActionButton
+        accessibilityLabel="Tambah agenda"
+        label="Agenda"
+        extended
+        onPress={openCreate}
+        style={styles.fab}
+      />
 
       <AgendaEditorModal
         visible={editorOpen}
@@ -358,6 +523,47 @@ export function AgendaScreen() {
   );
 }
 
+function SummaryCard({
+  glyph,
+  label,
+  value,
+}: {
+  glyph: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <AppCard elevated padding="md" style={styles.summaryCard}>
+      <IconBadge glyph={glyph} tone="primary" size="sm" />
+      <View style={styles.flexOne}>
+        <AppText variant="heading" tone="primary">
+          {value}
+        </AppText>
+        <AppText variant="micro" tone="muted">
+          {label}
+        </AppText>
+      </View>
+    </AppCard>
+  );
+}
+
+function MonthArrow({label, onPress}: {label: string; onPress: () => void}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label === '‹' ? 'Bulan sebelumnya' : 'Bulan berikutnya'}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.monthArrow,
+        pressed ? styles.monthArrowPressed : undefined,
+      ]}>
+      <AppText variant="heading" tone="primary" style={styles.monthArrowText}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
 function AgendaCard({
   entry,
   canManage,
@@ -369,57 +575,97 @@ function AgendaCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const meta = STATUS_META[entry.status];
-  const statusStyle =
-    entry.status === 'completed'
-      ? styles.statusCompleted
-      : entry.status === 'postponed'
-        ? styles.statusPostponed
-        : styles.statusScheduled;
+  const statusMeta = STATUS_META[entry.status];
+  const categoryMeta = CATEGORY_META[entry.category ?? 'work'];
 
   return (
-    <View style={styles.agendaCard}>
-      <View style={[styles.agendaAccent, statusStyle]} />
+    <AppCard elevated padding="none" style={styles.agendaCard}>
+      <View style={styles.agendaAccent} />
       <View style={styles.agendaBody}>
-        <View style={styles.agendaTopRow}>
-          <View style={[styles.statusPill, statusStyle]}>
-            <Text style={styles.statusText}>
-              {meta.glyph} {meta.label}
-            </Text>
+        <View style={styles.agendaBadgeRow}>
+          <View style={styles.badgeWrap}>
+            <Chip label={categoryMeta.label} tone={categoryMeta.tone} />
+            <Chip label={statusMeta.label} tone={statusMeta.tone} leadingDot />
           </View>
           {canManage ? (
             <View style={styles.cardActions}>
-              <Pressable onPress={onEdit} style={styles.cardActionButton}>
-                <Text style={styles.cardActionText}>Edit</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onEdit}
+                style={styles.cardAction}>
+                <AppText variant="label" tone="primary">
+                  Edit
+                </AppText>
               </Pressable>
-              <Pressable onPress={onDelete} style={styles.cardActionButton}>
-                <Text style={styles.cardDeleteText}>Hapus</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onDelete}
+                style={styles.cardAction}>
+                <AppText variant="label" tone="danger">
+                  Hapus
+                </AppText>
               </Pressable>
             </View>
           ) : null}
         </View>
 
-        <Text style={styles.agendaTitle}>{entry.title}</Text>
-        <Text style={styles.agendaTime}>
-          ◷ {formatTime(entry.startsAt)}
-          {entry.endsAt ? ` – ${formatTime(entry.endsAt)}` : ''}
-        </Text>
-        {entry.location ? (
-          <Text style={styles.agendaDetail}>⌖ {entry.location}</Text>
-        ) : null}
+        <AppText variant="section" style={styles.agendaTitle}>
+          {entry.title}
+        </AppText>
+
+        <View style={styles.agendaMetaList}>
+          <MetaLine
+            glyph="◷"
+            text={`${formatTime(entry.startsAt)}${
+              entry.endsAt ? ` – ${formatTime(entry.endsAt)}` : ''
+            }`}
+          />
+          {entry.location ? <MetaLine glyph="⌖" text={entry.location} /> : null}
+        </View>
+
         {entry.notes ? (
           <View style={styles.notesBox}>
-            <Text style={styles.notesText}>{entry.notes}</Text>
+            <AppText variant="caption" tone="secondary">
+              {entry.notes}
+            </AppText>
           </View>
         ) : null}
-        {entry.reminderEnabled && entry.reminderAt ? (
-          <Text style={styles.reminderText}>
-            ◉ Reminder {formatShortDate(entry.reminderAt)} · {formatTime(entry.reminderAt)}
-          </Text>
-        ) : (
-          <Text style={styles.reminderOffText}>Reminder tidak aktif</Text>
-        )}
+
+        <View style={styles.reminderLine}>
+          <IconBadge
+            glyph={entry.reminderEnabled ? '◉' : '○'}
+            tone={entry.reminderEnabled ? 'primary' : 'neutral'}
+            size="sm"
+          />
+          <View style={styles.flexOne}>
+            <AppText variant="label" tone={entry.reminderEnabled ? 'primary' : 'muted'}>
+              {entry.reminderEnabled && entry.reminderAt
+                ? `Reminder ${formatShortDate(entry.reminderAt)} · ${formatTime(
+                    entry.reminderAt,
+                  )}`
+                : 'Reminder tidak aktif'}
+            </AppText>
+            <AppText variant="micro" tone="muted">
+              {entry.reminderEnabled
+                ? 'Notifikasi lokal Android'
+                : 'Aktifkan saat mengedit agenda jika diperlukan'}
+            </AppText>
+          </View>
+        </View>
       </View>
+    </AppCard>
+  );
+}
+
+function MetaLine({glyph, text}: {glyph: string; text: string}) {
+  return (
+    <View style={styles.metaLine}>
+      <AppText variant="caption" tone="primary" style={styles.metaGlyph}>
+        {glyph}
+      </AppText>
+      <AppText variant="caption" tone="muted" style={styles.flexOne}>
+        {text}
+      </AppText>
     </View>
   );
 }
@@ -439,108 +685,82 @@ function AgendaEditorModal({
   onClose: () => void;
   onSave: (draft: AgendaDraft) => Promise<boolean>;
 }) {
-  const initial = useMemo(() => editorInitialState(selectedDate, entry), [entry, selectedDate]);
-  const [title, setTitle] = useState(initial.title);
-  const [location, setLocation] = useState(initial.location);
-  const [notes, setNotes] = useState(initial.notes);
-  const [startTime, setStartTime] = useState(initial.startTime);
-  const [endTime, setEndTime] = useState(initial.endTime);
-  const [reminderEnabled, setReminderEnabled] = useState(initial.reminderEnabled);
-  const [reminderMinutes, setReminderMinutes] = useState(initial.reminderMinutes);
-  const [status, setStatus] = useState<AgendaStatus>(initial.status);
+  const {width} = useWindowDimensions();
+  const compact = width < 370;
+  const initial = useMemo(
+    () => agendaEditorInitialState(selectedDate, entry),
+    [entry, selectedDate],
+  );
+  const [values, setValues] = useState<AgendaEditorValues>(initial);
   const [validation, setValidation] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (visible) {
-      const next = editorInitialState(selectedDate, entry);
-      setTitle(next.title);
-      setLocation(next.location);
-      setNotes(next.notes);
-      setStartTime(next.startTime);
-      setEndTime(next.endTime);
-      setReminderEnabled(next.reminderEnabled);
-      setReminderMinutes(next.reminderMinutes);
-      setStatus(next.status);
+      setValues(agendaEditorInitialState(selectedDate, entry));
       setValidation(null);
     }
   }, [entry, selectedDate, visible]);
 
-  const submit = async () => {
-    const start = combineLocalDateAndTime(selectedDate, startTime);
-    const end = endTime.trim()
-      ? combineLocalDateAndTime(selectedDate, endTime)
-      : null;
-
-    if (title.trim().length < 2) {
-      setValidation('Judul agenda minimal 2 karakter.');
-      return;
+  const setValue = <K extends keyof AgendaEditorValues>(
+    key: K,
+    value: AgendaEditorValues[K],
+  ) => {
+    setValues(current => ({...current, [key]: value}));
+    if (validation) {
+      setValidation(null);
     }
-    if (!start) {
-      setValidation('Jam mulai harus menggunakan format HH:mm, contoh 09:30.');
-      return;
-    }
-    if (endTime.trim() && !end) {
-      setValidation('Jam selesai belum valid. Gunakan format HH:mm.');
-      return;
-    }
-    if (end && end.getTime() <= start.getTime()) {
-      setValidation('Jam selesai harus setelah jam mulai.');
-      return;
-    }
-
-    const reminderAt = reminderEnabled
-      ? new Date(start.getTime() - reminderMinutes * 60_000)
-      : null;
-
-    if (
-      reminderEnabled &&
-      status !== 'completed' &&
-      reminderAt &&
-      reminderAt.getTime() <= Date.now()
-    ) {
-      setValidation('Waktu reminder harus berada di masa depan.');
-      return;
-    }
-
-    setValidation(null);
-    await onSave({
-      title,
-      location,
-      notes,
-      startsAt: start.toISOString(),
-      endsAt: end?.toISOString() ?? null,
-      reminderEnabled: reminderEnabled && status !== 'completed',
-      reminderAt:
-        reminderEnabled && status !== 'completed'
-          ? reminderAt?.toISOString() ?? start.toISOString()
-          : null,
-      status,
-    });
   };
 
+  const submit = async () => {
+    const result = buildAgendaDraft(selectedDate, values);
+    if (!result.draft) {
+      setValidation(result.error);
+      return;
+    }
+    setValidation(null);
+    await onSave(result.draft);
+  };
+
+  const modalDateLabel = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(selectedDate);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.modalBackdrop}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>
+            <View style={styles.flexOne}>
+              <AppText variant="heading">
                 {entry ? 'Edit Agenda' : 'Tambah Agenda'}
-              </Text>
-              <Text style={styles.modalDate}>
-                {new Intl.DateTimeFormat('id-ID', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                }).format(selectedDate)}
-              </Text>
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                {modalDateLabel}
+              </AppText>
             </View>
-            <Pressable disabled={saving} onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tutup editor agenda"
+              disabled={saving}
+              onPress={onClose}
+              style={({pressed}) => [
+                styles.closeButton,
+                pressed ? styles.closeButtonPressed : undefined,
+              ]}>
+              <AppText variant="heading" tone="muted">
+                ×
+              </AppText>
             </Pressable>
           </View>
 
@@ -548,150 +768,163 @@ function AgendaEditorModal({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.modalContent}>
-            <FieldLabel text="Judul Agenda" />
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Contoh: Rapat Tim Proyek"
-              placeholderTextColor="#A6AEAA"
-              maxLength={120}
-              style={styles.input}
-            />
-
-            <View style={styles.timeRow}>
-              <View style={styles.timeField}>
-                <FieldLabel text="Mulai" />
-                <TextInput
-                  value={startTime}
-                  onChangeText={setStartTime}
-                  placeholder="09:00"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                  style={styles.input}
-                />
-              </View>
-              <View style={styles.timeField}>
-                <FieldLabel text="Selesai (opsional)" />
-                <TextInput
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  placeholder="10:30"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                  style={styles.input}
-                />
+            <View style={styles.formSection}>
+              <AppText variant="label" tone="secondary">
+                Kategori
+              </AppText>
+              <View style={styles.choiceRow}>
+                {CATEGORY_OPTIONS.map(category => (
+                  <ChoicePill
+                    key={category}
+                    label={`${CATEGORY_META[category].glyph} ${CATEGORY_META[category].label}`}
+                    active={values.category === category}
+                    onPress={() => setValue('category', category)}
+                  />
+                ))}
               </View>
             </View>
 
-            <FieldLabel text="Lokasi (opsional)" />
-            <TextInput
-              value={location}
-              onChangeText={setLocation}
-              placeholder="Contoh: Jakarta Barat"
-              placeholderTextColor="#A6AEAA"
-              maxLength={240}
-              style={styles.input}
+            <TextField
+              label="Judul agenda"
+              value={values.title}
+              onChangeText={text => setValue('title', text)}
+              placeholder="Contoh: Rapat tim proyek"
+              maxLength={120}
+              autoCapitalize="sentences"
             />
 
-            <FieldLabel text="Catatan (opsional)" />
-            <TextInput
-              value={notes}
-              onChangeText={setNotes}
+            <View style={[styles.timeRow, compact ? styles.timeRowCompact : undefined]}>
+              <TextField
+                label="Mulai"
+                value={values.startTime}
+                onChangeText={text => setValue('startTime', text)}
+                placeholder="09:00"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                containerStyle={compact ? undefined : styles.timeField}
+              />
+              <TextField
+                label="Selesai"
+                value={values.endTime}
+                onChangeText={text => setValue('endTime', text)}
+                placeholder="10:30"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                helperText="Opsional"
+                containerStyle={compact ? undefined : styles.timeField}
+              />
+            </View>
+
+            <TextField
+              label="Lokasi"
+              value={values.location}
+              onChangeText={text => setValue('location', text)}
+              placeholder="Contoh: Ruang keluarga"
+              maxLength={240}
+              helperText="Opsional"
+            />
+
+            <TextField
+              label="Catatan"
+              value={values.notes}
+              onChangeText={text => setValue('notes', text)}
               placeholder="Tambahkan catatan agenda..."
-              placeholderTextColor="#A6AEAA"
               maxLength={1000}
               multiline
               textAlignVertical="top"
-              style={[styles.input, styles.notesInput]}
+              helperText="Opsional"
+              inputStyle={styles.notesInput}
             />
 
-            <FieldLabel text="Status" />
-            <View style={styles.statusSelector}>
-              {(Object.keys(STATUS_META) as AgendaStatus[]).map(value => (
-                <Pressable
-                  key={value}
-                  onPress={() => setStatus(value)}
-                  style={[
-                    styles.statusOption,
-                    status === value && styles.statusOptionActive,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.statusOptionText,
-                      status === value && styles.statusOptionTextActive,
-                    ]}>
-                    {STATUS_META[value].label}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.formSection}>
+              <AppText variant="label" tone="secondary">
+                Status
+              </AppText>
+              <View style={styles.choiceRow}>
+                {STATUS_OPTIONS.map(status => (
+                  <ChoicePill
+                    key={status}
+                    label={`${STATUS_META[status].glyph} ${STATUS_META[status].label}`}
+                    active={values.status === status}
+                    onPress={() => setValue('status', status)}
+                  />
+                ))}
+              </View>
             </View>
 
-            <View style={styles.reminderHeader}>
-              <View style={styles.reminderLabelWrap}>
-                <Text style={styles.fieldLabel}>Reminder</Text>
-                <Text style={styles.reminderHint}>
-                  Notifikasi lokal di perangkat Android
-                </Text>
+            <View style={styles.reminderSetting}>
+              <View style={styles.reminderSettingCopy}>
+                <AppText variant="bodyStrong">Reminder</AppText>
+                <AppText variant="caption" tone="muted">
+                  Notifikasi lokal sebelum agenda dimulai
+                </AppText>
               </View>
               <Switch
-                value={reminderEnabled && status !== 'completed'}
-                disabled={status === 'completed'}
-                onValueChange={setReminderEnabled}
-                trackColor={{false: '#D6DEDA', true: colors.primaryMuted}}
+                accessibilityLabel="Aktifkan reminder agenda"
+                value={values.reminderEnabled && values.status !== 'completed'}
+                disabled={values.status === 'completed'}
+                onValueChange={value => setValue('reminderEnabled', value)}
+                trackColor={{false: colors.border, true: colors.primaryMuted}}
                 thumbColor={
-                  reminderEnabled && status !== 'completed'
+                  values.reminderEnabled && values.status !== 'completed'
                     ? colors.primary
-                    : '#FFFFFF'
+                    : colors.surface
                 }
               />
             </View>
 
-            {reminderEnabled && status !== 'completed' ? (
-              <View style={styles.reminderOptions}>
-                {REMINDER_OPTIONS.map(minutes => (
-                  <Pressable
-                    key={minutes}
-                    onPress={() => setReminderMinutes(minutes)}
-                    style={[
-                      styles.reminderChip,
-                      reminderMinutes === minutes && styles.reminderChipActive,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.reminderChipText,
-                        reminderMinutes === minutes && styles.reminderChipTextActive,
-                      ]}>
-                      {minutes === 0
-                        ? 'Tepat waktu'
-                        : minutes === 60
-                          ? '1 jam sebelum'
-                          : `${minutes} mnt sebelum`}
-                    </Text>
-                  </Pressable>
-                ))}
+            {values.reminderEnabled && values.status !== 'completed' ? (
+              <View style={styles.formSection}>
+                <AppText variant="label" tone="secondary">
+                  Ingatkan
+                </AppText>
+                <View style={styles.choiceRow}>
+                  {REMINDER_OPTIONS.map(minutes => (
+                    <ChoicePill
+                      key={minutes}
+                      label={reminderLabel(minutes)}
+                      active={values.reminderMinutes === minutes}
+                      onPress={() => setValue('reminderMinutes', minutes)}
+                    />
+                  ))}
+                </View>
               </View>
             ) : null}
+
+            <View style={styles.pureAgendaHint}>
+              <IconBadge glyph="i" tone="info" size="sm" />
+              <AppText variant="caption" tone="muted" style={styles.flexOne}>
+                Agenda adalah reminder murni. Tidak ada upload bukti, approval,
+                atau verifikasi penyelesaian di modul ini.
+              </AppText>
+            </View>
 
             {validation ? (
               <View style={styles.validationBox}>
-                <Text style={styles.validationText}>{validation}</Text>
+                <IconBadge glyph="!" tone="danger" size="sm" />
+                <AppText variant="caption" tone="danger" style={styles.flexOne}>
+                  {validation}
+                </AppText>
               </View>
             ) : null}
 
-            <Pressable
-              disabled={saving}
-              onPress={() => {
-                submit().catch(() => undefined);
-              }}
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
-              {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>
-                  {entry ? 'Simpan Perubahan' : 'Simpan Agenda'}
-                </Text>
-              )}
-            </Pressable>
+            <View style={styles.modalActions}>
+              <AppButton
+                label="Batal"
+                variant="outline"
+                disabled={saving}
+                onPress={onClose}
+                style={styles.modalActionButton}
+              />
+              <AppButton
+                label={entry ? 'Simpan Perubahan' : 'Simpan Agenda'}
+                loading={saving}
+                onPress={() => {
+                  submit().catch(() => undefined);
+                }}
+                style={styles.modalActionButton}
+              />
+            </View>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -699,359 +932,294 @@ function AgendaEditorModal({
   );
 }
 
-function FieldLabel({text}: {text: string}) {
-  return <Text style={styles.fieldLabel}>{text}</Text>;
+function ChoicePill({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{selected: active}}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.choicePill,
+        active ? styles.choicePillActive : undefined,
+        pressed ? styles.choicePillPressed : undefined,
+      ]}>
+      <AppText
+        variant="label"
+        tone={active ? 'primary' : 'secondary'}
+        align="center">
+        {label}
+      </AppText>
+    </Pressable>
+  );
 }
 
-function editorInitialState(selectedDate: Date, entry: AgendaEntry | null) {
-  if (entry) {
-    const start = new Date(entry.startsAt);
-    const reminderMinutes = entry.reminderAt
-      ? Math.max(
-          0,
-          Math.round((start.getTime() - new Date(entry.reminderAt).getTime()) / 60_000),
-        )
-      : 10;
-
-    return {
-      title: entry.title,
-      location: entry.location ?? '',
-      notes: entry.notes ?? '',
-      startTime: formatTime(entry.startsAt).replace('.', ':'),
-      endTime: entry.endsAt ? formatTime(entry.endsAt).replace('.', ':') : '',
-      reminderEnabled: entry.reminderEnabled,
-      reminderMinutes: REMINDER_OPTIONS.includes(reminderMinutes)
-        ? reminderMinutes
-        : 10,
-      status: entry.status,
-    };
+function reminderLabel(minutes: number): string {
+  if (minutes === 0) {
+    return 'Tepat waktu';
   }
-
-  const now = new Date();
-  const sameDay = dateKey(now) === dateKey(selectedDate);
-  const startHour = sameDay ? Math.min(23, now.getHours() + 1) : 9;
-  const endHour = Math.min(23, startHour + 1);
-
-  return {
-    title: '',
-    location: '',
-    notes: '',
-    startTime: `${String(startHour).padStart(2, '0')}:00`,
-    endTime: `${String(endHour).padStart(2, '0')}:00`,
-    reminderEnabled: true,
-    reminderMinutes: 10,
-    status: 'scheduled' as AgendaStatus,
-  };
+  if (minutes === 60) {
+    return '1 jam sebelum';
+  }
+  return `${minutes} mnt sebelum`;
 }
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: colors.background},
-  content: {padding: spacing.xl, paddingBottom: 130, gap: spacing.lg},
-  header: {
+  content: {
+    width: '100%',
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.lg,
+    paddingBottom: 150,
+    gap: spacing.lg,
+  },
+  flexOne: {flex: 1},
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerIdentity: {alignItems: 'flex-end', maxWidth: '55%'},
-  headerName: {fontSize: 15, fontWeight: '800', color: colors.text},
-  headerRole: {fontSize: 11, color: colors.textMuted, marginTop: 2},
-  hero: {
-    minHeight: 112,
-    borderRadius: radius.lg,
-    backgroundColor: '#25AF80',
-    padding: spacing.xxl,
+  identityRow: {
+    maxWidth: '62%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    overflow: 'hidden',
+    gap: spacing.sm,
   },
-  heroTitle: {fontSize: 22, fontWeight: '900', color: '#FFFFFF'},
-  heroSubtitle: {fontSize: 14, color: '#E6FFF6', marginTop: 5},
-  heroIllustration: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  identityCopy: {flexShrink: 1},
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: radius.pill,
+    backgroundColor: colors.overlayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroGlyph: {fontSize: 42, color: '#FFFFFF'},
-  permissionCard: {
-    borderRadius: radius.md,
-    backgroundColor: colors.warningSoft,
-    padding: spacing.lg,
+  summaryRow: {flexDirection: 'row', gap: spacing.md},
+  summaryCard: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
   },
-  permissionTextWrap: {flex: 1},
-  permissionTitle: {fontSize: 13, fontWeight: '800', color: '#6A5700'},
-  permissionText: {fontSize: 11, lineHeight: 16, color: '#756822', marginTop: 3},
-  permissionButton: {
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#F1CF58',
+  permissionCard: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.warningSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  permissionButtonText: {fontSize: 11, fontWeight: '800', color: '#5C4B00'},
-  calendarCard: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.07,
-    shadowRadius: 18,
-    shadowOffset: {width: 0, height: 7},
-    elevation: 3,
-  },
-  monthHeader: {
+  permissionCopy: {flex: 1, gap: spacing.xxs},
+  calendarCard: {borderRadius: radius.xl},
+  calendarTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
+  monthLabel: {textTransform: 'capitalize'},
+  monthNavigation: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  monthNavigationLine: {flex: 1, height: 1, backgroundColor: colors.border},
   monthArrow: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  monthArrowText: {fontSize: 28, lineHeight: 30, color: colors.primaryDark},
-  monthTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.text,
-    textTransform: 'capitalize',
-  },
-  weekHeader: {flexDirection: 'row'},
-  weekday: {
-    width: '14.2857%',
-    textAlign: 'center',
-    fontSize: 9,
-    color: '#9AA4A0',
-    fontWeight: '700',
-    paddingVertical: 7,
-  },
+  monthArrowText: {lineHeight: 26, marginTop: -2},
+  monthArrowPressed: {opacity: 0.72, transform: [{scale: 0.96}]},
+  weekHeader: {marginTop: spacing.md, flexDirection: 'row'},
+  weekday: {width: '14.2857%', paddingVertical: spacing.sm},
   calendarGrid: {flexDirection: 'row', flexWrap: 'wrap'},
   dayCell: {
     width: '14.2857%',
-    height: 44,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayCellSelected: {backgroundColor: colors.primary},
-  dayCellToday: {borderWidth: 1, borderColor: colors.primaryMuted},
-  dayText: {fontSize: 14, color: colors.text},
-  dayTextSelected: {color: '#FFFFFF', fontWeight: '900'},
-  eventDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-    marginTop: 3,
-  },
-  eventDotSelected: {backgroundColor: '#FFFFFF'},
-  sectionHeader: {
-    marginTop: spacing.sm,
+  dayCellToday: {borderWidth: 1.2, borderColor: colors.primary},
+  dayCellPressed: {opacity: 0.72},
+  dayEventRow: {
+    minHeight: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.xxs,
+    marginTop: spacing.xxs,
   },
-  sectionTitle: {fontSize: 19, fontWeight: '900', color: colors.text},
-  sectionSubtitle: {fontSize: 12, color: colors.textMuted, marginTop: 3},
-  addSmallButton: {
+  eventDot: {
+    width: 5,
+    height: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    backgroundColor: colors.primary,
   },
-  addSmallButtonText: {fontSize: 12, fontWeight: '800', color: colors.primaryDark},
+  eventDotSelected: {backgroundColor: colors.primaryOn},
+  sectionBlock: {gap: spacing.md},
   errorCard: {
     borderRadius: radius.md,
-    backgroundColor: colors.dangerSoft,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  errorText: {flex: 1, color: colors.danger, fontSize: 12, lineHeight: 18},
-  errorAction: {fontSize: 12, fontWeight: '900', color: colors.danger},
-  loadingCard: {
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    gap: 10,
-  },
-  loadingText: {fontSize: 12, color: colors.textMuted},
-  emptyCard: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 2,
-  },
-  emptyIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyGlyph: {fontSize: 27, color: colors.primaryDark},
-  emptyTitle: {fontSize: 16, fontWeight: '900', color: colors.text, marginTop: 14},
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textMuted,
-    marginTop: 5,
-  },
-  emptyButton: {
-    marginTop: spacing.lg,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-  },
-  emptyButtonText: {color: '#FFFFFF', fontSize: 12, fontWeight: '900'},
-  agendaCard: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 2,
-  },
-  agendaAccent: {width: 5},
-  agendaBody: {flex: 1, padding: spacing.xl},
-  agendaTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
-  statusPill: {borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5},
-  statusScheduled: {backgroundColor: '#DDF6ED'},
-  statusPostponed: {backgroundColor: '#FFE5E5'},
-  statusCompleted: {backgroundColor: '#DDF6E8'},
-  statusText: {fontSize: 10, fontWeight: '800', color: '#315047'},
-  cardActions: {flexDirection: 'row', gap: 4},
-  cardActionButton: {paddingHorizontal: 8, paddingVertical: 5},
-  cardActionText: {fontSize: 11, fontWeight: '800', color: colors.primaryDark},
-  cardDeleteText: {fontSize: 11, fontWeight: '800', color: colors.danger},
-  agendaTitle: {fontSize: 16, fontWeight: '900', color: colors.text, marginTop: 13},
-  agendaTime: {fontSize: 12, color: colors.textMuted, marginTop: 9},
-  agendaDetail: {fontSize: 12, color: colors.textMuted, marginTop: 6},
-  notesBox: {
-    marginTop: 12,
-    borderRadius: radius.sm,
-    backgroundColor: '#F0F4FF',
     padding: spacing.md,
+    backgroundColor: colors.dangerSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  notesText: {fontSize: 12, lineHeight: 18, color: colors.textMuted},
-  reminderText: {fontSize: 10, color: colors.primaryDark, marginTop: 10, fontWeight: '700'},
-  reminderOffText: {fontSize: 10, color: '#8D9692', marginTop: 10},
-  fab: {
-    position: 'absolute',
-    right: 22,
-    bottom: 92,
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.primary,
+  loadingCard: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 7},
-    elevation: 8,
+    gap: spacing.md,
   },
-  fabText: {color: '#FFFFFF', fontSize: 34, lineHeight: 36, fontWeight: '300'},
-  modalBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(17,31,27,0.35)'},
+  emptyCard: {alignItems: 'center', gap: spacing.md},
+  emptyButton: {marginTop: spacing.sm},
+  agendaList: {gap: spacing.md},
+  agendaCard: {flexDirection: 'row', overflow: 'hidden'},
+  agendaAccent: {width: 5, backgroundColor: colors.primary},
+  agendaBody: {flex: 1, padding: spacing.lg},
+  agendaBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  badgeWrap: {flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
+  cardActions: {flexDirection: 'row', alignItems: 'center'},
+  cardAction: {paddingHorizontal: spacing.sm, paddingVertical: spacing.xs},
+  agendaTitle: {marginTop: spacing.md},
+  agendaMetaList: {marginTop: spacing.md, gap: spacing.xs},
+  metaLine: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
+  metaGlyph: {width: 18, textAlign: 'center'},
+  notesBox: {
+    marginTop: spacing.md,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    backgroundColor: colors.infoSoft,
+  },
+  reminderLine: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  reminderInfoCard: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.infoSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  fab: {position: 'absolute', right: 20, bottom: 94},
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: colors.overlay,
+  },
   modalSheet: {
-    maxHeight: '92%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    maxHeight: '94%',
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
     backgroundColor: colors.surface,
-    paddingTop: 10,
+    paddingTop: spacing.sm,
+    ...shadows.lg,
   },
   modalHandle: {
     alignSelf: 'center',
-    width: 44,
+    width: 46,
     height: 5,
-    borderRadius: 3,
-    backgroundColor: '#CBD5D0',
+    borderRadius: radius.pill,
+    backgroundColor: colors.borderStrong,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    gap: spacing.md,
+    paddingHorizontal: layout.screenPadding,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  modalTitle: {fontSize: 21, fontWeight: '900', color: colors.text},
-  modalDate: {fontSize: 11, color: colors.textMuted, marginTop: 4},
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F1F4F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {fontSize: 25, color: colors.textMuted, lineHeight: 27},
-  modalContent: {paddingHorizontal: spacing.xl, paddingBottom: 38},
-  fieldLabel: {fontSize: 12, fontWeight: '800', color: colors.text, marginTop: 16, marginBottom: 7},
-  input: {
-    minHeight: 52,
-    borderWidth: 1.4,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    color: colors.text,
-    backgroundColor: '#FCFDFC',
-    fontSize: 13,
-  },
-  notesInput: {height: 92, paddingTop: 14},
-  timeRow: {flexDirection: 'row', gap: 10},
-  timeField: {flex: 1},
-  statusSelector: {flexDirection: 'row', gap: 7},
-  statusOption: {
-    flex: 1,
-    minHeight: 40,
+    width: 42,
+    height: 42,
     borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F2F5F4',
   },
-  statusOptionActive: {backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary},
-  statusOptionText: {fontSize: 10, fontWeight: '700', color: colors.textMuted},
-  statusOptionTextActive: {color: colors.primaryDark, fontWeight: '900'},
-  reminderHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4},
-  reminderLabelWrap: {flex: 1},
-  reminderHint: {fontSize: 10, color: colors.textMuted, marginTop: -4},
-  reminderOptions: {flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10},
-  reminderChip: {borderRadius: radius.pill, backgroundColor: '#F2F5F4', paddingHorizontal: 11, paddingVertical: 8},
-  reminderChipActive: {backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary},
-  reminderChipText: {fontSize: 10, fontWeight: '700', color: colors.textMuted},
-  reminderChipTextActive: {color: colors.primaryDark, fontWeight: '900'},
-  validationBox: {marginTop: 16, borderRadius: radius.md, backgroundColor: colors.dangerSoft, padding: spacing.md},
-  validationText: {fontSize: 11, lineHeight: 17, color: colors.danger, fontWeight: '700'},
-  saveButton: {marginTop: 22, minHeight: 54, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center'},
-  saveButtonDisabled: {opacity: 0.65},
-  saveButtonText: {color: '#FFFFFF', fontSize: 14, fontWeight: '900'},
+  closeButtonPressed: {opacity: 0.72},
+  modalContent: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.lg,
+    paddingBottom: 38,
+    gap: spacing.lg,
+  },
+  formSection: {gap: spacing.sm},
+  choiceRow: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
+  choicePill: {
+    minHeight: 38,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choicePillActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  choicePillPressed: {opacity: 0.75},
+  timeRow: {flexDirection: 'row', gap: spacing.md},
+  timeRowCompact: {flexDirection: 'column'},
+  timeField: {flex: 1},
+  notesInput: {minHeight: 96, paddingVertical: spacing.md},
+  reminderSetting: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  reminderSettingCopy: {flex: 1},
+  pureAgendaHint: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.infoSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  validationBox: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.dangerSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  modalActions: {flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm},
+  modalActionButton: {flex: 1},
 });
