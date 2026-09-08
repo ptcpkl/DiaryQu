@@ -1,13 +1,19 @@
 import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
 import {getSupabaseClient} from '../../../lib/supabase/client';
 import {DEMO_FAMILY_ID, DEMO_USER_ID} from '../../../mocks/demoData';
-import type {AgendaDraft, AgendaEntry, AgendaStatus} from '../types';
+import type {
+  AgendaCategory,
+  AgendaDraft,
+  AgendaEntry,
+  AgendaStatus,
+} from '../types';
 
 type AgendaRow = {
   id: string;
   family_id: string;
   created_by: string;
   title: string;
+  category: AgendaCategory;
   notes: string | null;
   location: string | null;
   starts_at: string;
@@ -25,6 +31,7 @@ function toEntry(row: AgendaRow): AgendaEntry {
     familyId: row.family_id,
     createdBy: row.created_by,
     title: row.title,
+    category: row.category ?? 'work',
     notes: row.notes,
     location: row.location,
     startsAt: row.starts_at,
@@ -40,12 +47,15 @@ function toEntry(row: AgendaRow): AgendaEntry {
 function toPayload(draft: AgendaDraft) {
   return {
     title: draft.title.trim(),
+    category: draft.category ?? 'work',
     notes: draft.notes?.trim() || null,
     location: draft.location?.trim() || null,
     starts_at: draft.startsAt,
     ends_at: draft.endsAt ?? null,
     reminder_enabled: draft.reminderEnabled,
-    reminder_at: draft.reminderEnabled ? draft.reminderAt ?? draft.startsAt : null,
+    reminder_at: draft.reminderEnabled
+      ? draft.reminderAt ?? draft.startsAt
+      : null,
     status: draft.status ?? 'scheduled',
   };
 }
@@ -65,6 +75,7 @@ function createInitialDemoItems(): AgendaEntry[] {
       familyId: DEMO_FAMILY_ID,
       createdBy: DEMO_USER_ID,
       title: 'Evaluasi agenda keluarga',
+      category: 'business',
       notes: 'Cek kebutuhan keluarga untuk minggu ini.',
       location: 'Rumah',
       startsAt: atLocalTime(0, 19, 30),
@@ -80,6 +91,7 @@ function createInitialDemoItems(): AgendaEntry[] {
       familyId: DEMO_FAMILY_ID,
       createdBy: DEMO_USER_ID,
       title: 'Kajian keluarga',
+      category: 'islamic',
       notes: 'Bawa catatan dan mushaf.',
       location: 'Masjid terdekat',
       startsAt: atLocalTime(1, 18, 30),
@@ -119,12 +131,15 @@ function demoDraftToEntry(
     familyId,
     createdBy: userId,
     title: draft.title.trim(),
+    category: draft.category ?? 'work',
     notes: draft.notes?.trim() || null,
     location: draft.location?.trim() || null,
     startsAt: draft.startsAt,
     endsAt: draft.endsAt ?? null,
     reminderEnabled: draft.reminderEnabled,
-    reminderAt: draft.reminderEnabled ? draft.reminderAt ?? draft.startsAt : null,
+    reminderAt: draft.reminderEnabled
+      ? draft.reminderAt ?? draft.startsAt
+      : null,
     status: draft.status ?? 'scheduled',
     createdAt,
     updatedAt: now,
@@ -132,7 +147,11 @@ function demoDraftToEntry(
 }
 
 export const agendaService = {
-  async listRange(familyId: string, startIso: string, endIso: string): Promise<AgendaEntry[]> {
+  async listRange(
+    familyId: string,
+    startIso: string,
+    endIso: string,
+  ): Promise<AgendaEntry[]> {
     if (FRONTEND_DEMO_MODE) {
       return getDemoItems()
         .filter(
@@ -159,7 +178,11 @@ export const agendaService = {
     return ((data ?? []) as AgendaRow[]).map(toEntry);
   },
 
-  async listUpcoming(familyId: string, fromIso: string, limit = 2): Promise<AgendaEntry[]> {
+  async listUpcoming(
+    familyId: string,
+    fromIso: string,
+    limit = 2,
+  ): Promise<AgendaEntry[]> {
     if (FRONTEND_DEMO_MODE) {
       return getDemoItems()
         .filter(
@@ -188,10 +211,20 @@ export const agendaService = {
     return ((data ?? []) as AgendaRow[]).map(toEntry);
   },
 
-  async create(familyId: string, userId: string, draft: AgendaDraft): Promise<AgendaEntry> {
+  async create(
+    familyId: string,
+    userId: string,
+    draft: AgendaDraft,
+  ): Promise<AgendaEntry> {
     if (FRONTEND_DEMO_MODE) {
       const now = new Date().toISOString();
-      const entry = demoDraftToEntry(createDemoId(), familyId, userId, draft, now);
+      const entry = demoDraftToEntry(
+        createDemoId(),
+        familyId,
+        userId,
+        draft,
+        now,
+      );
       demoItems = [...getDemoItems(), entry];
       return entry;
     }
@@ -222,7 +255,9 @@ export const agendaService = {
         draft,
         current.createdAt,
       );
-      demoItems = getDemoItems().map(item => (item.id === id ? updated : item));
+      demoItems = getDemoItems().map(item =>
+        item.id === id ? updated : item,
+      );
       return updated;
     }
 
@@ -246,7 +281,10 @@ export const agendaService = {
       return;
     }
 
-    const {error} = await getSupabaseClient().from('agenda_entries').delete().eq('id', id);
+    const {error} = await getSupabaseClient()
+      .from('agenda_entries')
+      .delete()
+      .eq('id', id);
     if (error) {
       throw error;
     }
