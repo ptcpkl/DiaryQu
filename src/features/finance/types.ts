@@ -21,6 +21,27 @@ export interface FinanceTransactionDraft {
   occurredOn: string;
 }
 
+export interface FinanceBill {
+  id: string;
+  familyId: string;
+  createdBy: string;
+  title: string;
+  amount: number;
+  dueDay: number;
+  note: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceBillDraft {
+  title: string;
+  amount: number;
+  dueDay: number;
+  note: string | null;
+  isActive: boolean;
+}
+
 export interface FinancePeriodTotals {
   income: number;
   expense: number;
@@ -32,6 +53,12 @@ export interface FinanceSummary {
   allTime: FinancePeriodTotals;
   monthly: FinancePeriodTotals;
   yearly: FinancePeriodTotals;
+}
+
+export interface FinanceBillSummary {
+  activeCount: number;
+  monthlyTotal: number;
+  dueSoonCount: number;
 }
 
 export type FinanceFilter = 'all' | FinanceTransactionType;
