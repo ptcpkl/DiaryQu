@@ -9,7 +9,6 @@ This file tracks feature delivery against the DiaryQu PRD and current product de
 - Zustand authentication state and frontend demo-login mode
 - Supabase client and auth integration
 - Family Room schema, RLS helpers, create/join RPC contracts, and family setup gate
-- Profile and static Contribution screens
 - Global DiaryQu design system and reusable UI primitives
 - Home Dashboard frontend milestone
 - Agenda CRUD, categories, Android reminders, calendar/list/editor UI, and tests
@@ -22,17 +21,21 @@ This file tracks feature delivery against the DiaryQu PRD and current product de
 - Family Location Tracking UI with family member selector, relative map preview, location freshness, selected-member detail, OpenStreetMap handoff, loading/error/empty states, and demo data
 - Consent-first foreground Android location bridge using coarse/fine permission only when the user explicitly presses share/update
 - Family location persistence stores latest position only, clears coordinates when sharing stops, protects rows with family-scoped RLS, and synchronizes visible changes with Supabase Realtime
-- Automated tracking helper tests and Android Kotlin compile coverage
+- Profile dashboard with large identity header, current shared-location summary, family-member location shortcuts, settings navigation, logout, and static contribution banner
+- Account Settings for authenticated user profile name and phone number with self-only profile persistence and auth display-name synchronization
+- Family Room settings with member list, Family Code sharing/regeneration, family rename, secure Head transfer, Head-only member removal, and Member leave-room flow
+- Family role mutations are RPC-only and enforce one Head per Family Room; client state cannot self-promote to Head
+- Automated profile/family helper tests plus existing TypeScript, ESLint, Jest, and Android Kotlin compile coverage
 
 ## Current milestone
 
-- Stage 8: Family Location Tracking implementation complete in code
-- Database migration `20260908152000_family_location_tracking.sql` must be applied manually before production mode uses tracking
-- Tracking is intentionally privacy-first: no background permission, no continuous broadcast, and no location-history table
-- Family members only see rows whose owner has `sharing_enabled = true`; each user can only write or clear their own location row
+- Stage 9: Profile + Family Room / Settings polish complete in code
+- Database migration `20260908164000_profile_family_settings.sql` must be applied manually before production mode uses Family Room management actions
+- Profile edits reuse the existing `profiles` table from Family Foundation; no new profile table is introduced
+- Family metadata changes are RPC-only from Stage 9 onward, and direct authenticated updates to `families` are revoked
 
 ## Next milestones
 
-- Remaining Profile/Family settings polish
-- Ads integration and release hardening
+- Ads integration and monetization shell
+- Cross-feature hardening, visual polish, and accessibility pass
 - Play Store release preparation
