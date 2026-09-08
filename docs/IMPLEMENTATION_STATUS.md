@@ -17,15 +17,20 @@ This file tracks feature delivery against the DiaryQu PRD.
 - Agenda Android local reminder, snooze 5 minutes, dismiss, and reboot rescheduling
 - Agenda calendar/list/create/edit/delete UI polish
 - Agenda editor validation and automated tests
+- Daily Routines recurring schedules, member assignment, rewards, active state, and daily progress
+- Daily Routines proof submission with Android system photo picker
+- Daily Routines private proof storage, family-scoped access policies, and signed proof URLs
+- Daily Routines pending/approved/rejected review flow with self-approval protection
+- Daily Routines realtime family refresh and automated schedule tests
 
 ## Current milestone
 
-- Stage 4: Agenda UI/UX complete
-- Database migration `20260908094500_agenda_category.sql` must be applied manually to the target Supabase project before production mode uses Agenda categories
+- Stage 5: Daily Routines implementation complete in code
+- Database migration `20260908104500_daily_routines.sql` must be applied manually to the target Supabase project before production mode uses Daily Routines
+- Routine proof storage intentionally uses the existing Supabase Auth + private Supabase Storage security model so family isolation can be enforced without exposing a second unauthenticated storage system
 
 ## Next milestones
 
-- Daily Routines UI/UX, recurrence, assignment, reward, proof submission, and head approval workflow
 - UangQu and AssetQu persistence + UI
 - Family location tracking
 - Remaining Profile/Family settings polish
