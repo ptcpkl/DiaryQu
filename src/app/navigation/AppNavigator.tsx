@@ -2,7 +2,7 @@ import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {NavigationContainer, DefaultTheme} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React, {useEffect} from 'react';
-import {ActivityIndicator, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Linking, StyleSheet, Text, View} from 'react-native';
 
 import {AppText} from '../../components/ui';
 import {
@@ -16,6 +16,8 @@ import {
 } from '../../constants/theme';
 import {AgendaScreen} from '../../features/agenda/screens/AgendaScreen';
 import {LoginScreen} from '../../features/auth/screens/LoginScreen';
+import {RegisterScreen} from '../../features/auth/screens/RegisterScreen';
+import {AUTH_REDIRECT_URL} from '../../features/auth/services/authService';
 import {useAuthStore} from '../../features/auth/store/authStore';
 import {ContributionScreen} from '../../features/contribution/screens/ContributionScreen';
 import {FamilyInfoScreen} from '../../features/family/screens/FamilyInfoScreen';
@@ -141,6 +143,7 @@ function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{headerShown: false}}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -170,6 +173,7 @@ export function AppNavigator() {
   const status = useAuthStore(state => state.status);
   const session = useAuthStore(state => state.session);
   const initialize = useAuthStore(state => state.initialize);
+  const completeOAuthCallback = useAuthStore(state => state.completeOAuthCallback);
   const resetFamily = useFamilyStore(state => state.reset);
   const resetProfile = useProfileStore(state => state.reset);
   const userId = session?.user.id ?? null;
@@ -191,6 +195,18 @@ export function AppNavigator() {
       unsubscribe?.();
     };
   }, [initialize]);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (url?.startsWith(AUTH_REDIRECT_URL)) {
+        completeOAuthCallback(url).catch(() => undefined);
+      }
+    };
+
+    Linking.getInitialURL().then(handleUrl).catch(() => undefined);
+    const subscription = Linking.addEventListener('url', event => handleUrl(event.url));
+    return () => subscription.remove();
+  }, [completeOAuthCallback]);
 
   useEffect(() => {
     resetFamily();
