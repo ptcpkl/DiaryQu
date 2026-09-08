@@ -1,4 +1,7 @@
 import type {
+  FinanceBill,
+  FinanceBillDraft,
+  FinanceBillSummary,
   FinanceSummary,
   FinanceTransaction,
   FinanceTransactionDraft,
@@ -105,6 +108,23 @@ export function calculateFinanceSummary(
   return {balance: allTime.net, allTime, monthly, yearly};
 }
 
+export function calculateBillSummary(
+  bills: FinanceBill[],
+  now = new Date(),
+): FinanceBillSummary {
+  const activeBills = bills.filter(bill => bill.isActive);
+  const today = now.getDate();
+  return {
+    activeCount: activeBills.length,
+    monthlyTotal: activeBills.reduce((total, bill) => total + bill.amount, 0),
+    dueSoonCount: activeBills.filter(bill => bill.dueDay >= today && bill.dueDay <= today + 7).length,
+  };
+}
+
+export function formatBillDueDay(dueDay: number): string {
+  return `Tanggal ${Math.min(31, Math.max(1, Math.round(dueDay)))}`;
+}
+
 export function groupTransactions(
   transactions: FinanceTransaction[],
 ): FinanceTransactionGroup[] {
@@ -144,5 +164,18 @@ export function validateFinanceDraft(
   if ((draft.note?.length ?? 0) > 500) {
     return 'Catatan maksimal 500 karakter.';
   }
+  return null;
+}
+
+export function validateFinanceBillDraft(draft: FinanceBillDraft): string | null {
+  if (draft.title.trim().length < 2) return 'Nama tagihan minimal 2 karakter.';
+  if (!Number.isSafeInteger(draft.amount) || draft.amount <= 0) {
+    return 'Nominal tagihan harus lebih dari Rp 0.';
+  }
+  if (draft.amount > 9_000_000_000_000) return 'Nominal tagihan terlalu besar.';
+  if (!Number.isInteger(draft.dueDay) || draft.dueDay < 1 || draft.dueDay > 31) {
+    return 'Tanggal jatuh tempo harus antara 1 sampai 31.';
+  }
+  if ((draft.note?.length ?? 0) > 500) return 'Catatan tagihan maksimal 500 karakter.';
   return null;
 }

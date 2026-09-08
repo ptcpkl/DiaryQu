@@ -4,6 +4,7 @@ import {
   StyleSheet,
   View,
   type PressableProps,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
@@ -17,7 +18,7 @@ interface AppCardProps extends Omit<PressableProps, 'children' | 'style'> {
   variant?: AppCardVariant;
   padding?: AppCardPadding;
   elevated?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   onPress?: PressableProps['onPress'];
 }
 
@@ -45,15 +46,15 @@ export function AppCard({
   onPress,
   ...pressableProps
 }: AppCardProps) {
-  const baseStyle: ViewStyle[] = [
+  const baseStyle: StyleProp<ViewStyle> = [
     styles.base,
     {
       backgroundColor: backgroundByVariant[variant],
       padding: paddingBySize[padding],
     },
-    variant === 'outlined' ? styles.outlined : {},
+    variant === 'outlined' ? styles.outlined : undefined,
     elevated ? shadows.md : shadows.none,
-    style ?? {},
+    style,
   ];
 
   if (!onPress) {

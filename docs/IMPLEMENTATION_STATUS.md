@@ -1,6 +1,6 @@
 # DiaryQu Implementation Status
 
-This file tracks feature delivery against the DiaryQu PRD.
+This file tracks feature delivery against the DiaryQu PRD and current product decisions.
 
 ## Completed
 
@@ -12,31 +12,25 @@ This file tracks feature delivery against the DiaryQu PRD.
 - Profile and static Contribution screens
 - Global DiaryQu design system and reusable UI primitives
 - Home Dashboard frontend milestone
-- Agenda CRUD and demo repository
-- Agenda categories: Work, Business, Islamic
-- Agenda Android local reminder, snooze 5 minutes, dismiss, and reboot rescheduling
-- Agenda calendar/list/create/edit/delete UI polish
-- Agenda editor validation and automated tests
-- Daily Routines recurring schedules, member assignment, rewards, active state, and daily progress
-- Daily Routines proof submission with Android system photo picker
-- Daily Routines private proof storage, family-scoped access policies, and signed proof URLs
-- Daily Routines pending/approved/rejected review flow with self-approval protection
-- Daily Routines realtime family refresh and automated schedule tests
-- UangQu transaction persistence with income/expense, category, note, date, and immutable family ownership
-- UangQu lifetime balance, current-month statistics, current-year statistics, and grouped daily history
-- UangQu head-only write permissions with family-member read visibility enforced by RLS
-- UangQu realtime family synchronization, frontend demo repository, editor validation, and automated finance calculations
+- Agenda CRUD, categories, Android reminders, calendar/list/editor UI, and tests
+- Daily Routines recurring schedules, member assignment, rewards, proof workflow, approval/rejection, private storage, realtime refresh, and tests
+- UangQu family-scoped income/expense transactions, cumulative balance, monthly/yearly summaries, grouped history, CRUD, realtime refresh, RLS, demo data, and tests
+- Finance dashboard columns: Pemasukan, Pengeluaran, and List Tagihan. The former Budget slot is intentionally replaced by List Tagihan.
+- List Tagihan recurring monthly bill definitions with amount, due day, active/archive state, family visibility, head-only management, realtime refresh, RLS, demo data, and tests
+- AssetQu categories: Tabungan, Emas, Tanah, Kebun, and Hutang
+- AssetQu CRUD, estimated current value, optional quantity/unit, notes, acquired date, active/archive state, family visibility, realtime refresh, RLS, demo data, net-worth calculation, and tests
 
 ## Current milestone
 
-- Stage 6: UangQu / Finance implementation complete in code
-- Database migration `20260908114000_uangqu_finance.sql` must be applied manually to the target Supabase project before production mode uses UangQu
-- Historical transactions are never destructively reset: lifetime balance uses all transactions, while monthly/yearly statistics are derived from the relevant date periods
-- AssetQu remains a separate domain and is intentionally scheduled for the next milestone
+- Stage 7: AssetQu implementation complete in code
+- Database migrations must be applied manually to the target Supabase project before production mode uses the new Finance additions:
+  - `20260908135500_finance_bills.sql`
+  - `20260908143000_assetqu.sql`
+- UangQu lifetime balance remains non-destructive: month/year cards are computed views over transaction history and do not reset stored records.
+- AssetQu treats Hutang as a liability: net worth = active non-debt assets - active debt.
 
 ## Next milestones
 
-- AssetQu CRUD, categories, timestamps, persistence, and UI
 - Family location tracking
 - Remaining Profile/Family settings polish
 - Ads integration and release hardening
