@@ -23,12 +23,10 @@ import {
 } from '../../../components/ui';
 import {
   colors,
-  fontWeight,
   layout,
   radius,
   shadows,
   spacing,
-  typography,
 } from '../../../constants/theme';
 import {useFamilyStore} from '../../family/store/familyStore';
 import {useFinanceStore} from '../store/financeStore';
@@ -420,7 +418,7 @@ export function FinanceScreen() {
         </View>
 
         {module === 'assetqu' ? (
-          <AppCard padding="lg" elevated style={styles.assetPlaceholder}>
+          <AppCard padding="xl" elevated style={styles.assetPlaceholder}>
             <View style={styles.assetPlaceholderIcon}>
               <AppText variant="title" tone="primary">◇</AppText>
             </View>
@@ -700,7 +698,11 @@ const styles = StyleSheet.create({
   fab: {position: 'absolute', right: spacing.xl, bottom: spacing.xl},
   modalRoot: {flex: 1, justifyContent: 'flex-end'},
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: colors.overlay,
   },
   sheet: {
