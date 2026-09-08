@@ -358,10 +358,14 @@ create policy routine_assignments_select_family
 on public.routine_assignments for select to authenticated
 using (public.is_family_member(family_id));
 
+-- A member can see only their own proof/submission history; family heads can review all.
 drop policy if exists routine_submissions_select_family on public.routine_submissions;
 create policy routine_submissions_select_family
 on public.routine_submissions for select to authenticated
-using (public.is_family_member(family_id));
+using (
+  member_id = auth.uid()
+  or public.is_family_head(family_id)
+);
 
 revoke all on public.routine_definitions from anon, authenticated;
 revoke all on public.routine_assignments from anon, authenticated;
@@ -380,7 +384,7 @@ grant execute on function public.delete_family_routine(uuid) to authenticated;
 grant execute on function public.submit_routine_completion(uuid, date, text, text, text) to authenticated;
 grant execute on function public.review_routine_submission(uuid, text, text) to authenticated;
 
--- Private proof bucket. Supabase Auth + family membership controls all access.
+-- Private proof bucket. Members can access only their own proof files; heads can review family proofs.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'routine-proofs',
@@ -399,10 +403,21 @@ create policy routine_proofs_select_family
 on storage.objects for select to authenticated
 using (
   bucket_id = 'routine-proofs'
-  and exists (
-    select 1 from public.family_members
-    where family_id::text = split_part(name, '/', 1)
-      and user_id = auth.uid()
+  and (
+    (
+      split_part(name, '/', 2) = auth.uid()::text
+      and exists (
+        select 1 from public.family_members
+        where family_id::text = split_part(name, '/', 1)
+          and user_id = auth.uid()
+      )
+    )
+    or exists (
+      select 1 from public.family_members
+      where family_id::text = split_part(name, '/', 1)
+        and user_id = auth.uid()
+        and role = 'head'
+    )
   )
 );
 
@@ -425,10 +440,20 @@ on storage.objects for update to authenticated
 using (
   bucket_id = 'routine-proofs'
   and split_part(name, '/', 2) = auth.uid()::text
+  and exists (
+    select 1 from public.family_members
+    where family_id::text = split_part(name, '/', 1)
+      and user_id = auth.uid()
+  )
 )
 with check (
   bucket_id = 'routine-proofs'
   and split_part(name, '/', 2) = auth.uid()::text
+  and exists (
+    select 1 from public.family_members
+    where family_id::text = split_part(name, '/', 1)
+      and user_id = auth.uid()
+  )
 );
 
 drop policy if exists routine_proofs_delete_owner_or_head on storage.objects;
@@ -437,7 +462,14 @@ on storage.objects for delete to authenticated
 using (
   bucket_id = 'routine-proofs'
   and (
-    split_part(name, '/', 2) = auth.uid()::text
+    (
+      split_part(name, '/', 2) = auth.uid()::text
+      and exists (
+        select 1 from public.family_members
+        where family_id::text = split_part(name, '/', 1)
+          and user_id = auth.uid()
+      )
+    )
     or exists (
       select 1 from public.family_members
       where family_id::text = split_part(name, '/', 1)
