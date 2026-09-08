@@ -130,10 +130,12 @@ export function TrackingScreen() {
         longitude: selectedLocation.longitude,
       };
     }
+
     const first = visibleLocations[0]?.location;
-    return first?.latitude !== null && first?.longitude !== null && first
-      ? {latitude: first.latitude, longitude: first.longitude}
-      : null;
+    if (first && first.latitude !== null && first.longitude !== null) {
+      return {latitude: first.latitude, longitude: first.longitude};
+    }
+    return null;
   }, [selectedMember, visibleLocations]);
 
   const handleShareLocation = async () => {
@@ -184,12 +186,16 @@ export function TrackingScreen() {
   const openInOsm = async (member: TrackingMemberLocation) => {
     const latitude = member.location?.latitude;
     const longitude = member.location?.longitude;
-    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+    if (
+      latitude === null ||
+      latitude === undefined ||
+      longitude === null ||
+      longitude === undefined
+    ) {
       return;
     }
     const url = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) await Linking.openURL(url);
+    if (await Linking.canOpenURL(url)) await Linking.openURL(url);
   };
 
   const mySharingEnabled = Boolean(myEntry?.location?.sharingEnabled);
@@ -218,7 +224,7 @@ export function TrackingScreen() {
             <View style={styles.flexOne}>
               <AppText variant="section">Berbagi lokasi dengan kendali penuh</AppText>
               <AppText variant="bodySmall" tone="muted">
-                DiaryQu hanya mengambil lokasi ketika Anda menekan tombol perbarui. Tidak ada pelacakan background atau riwayat perjalanan.
+                Lokasi hanya diambil ketika Anda menekan tombol perbarui. Tidak ada pelacakan background atau riwayat perjalanan.
               </AppText>
             </View>
           </View>
@@ -305,10 +311,10 @@ export function TrackingScreen() {
 
         <AppCard padding="none" elevated style={styles.mapCard}>
           <View style={styles.mapCanvas}>
-            <View style={[styles.gridLine, styles.gridLineHorizontalOne]} />
-            <View style={[styles.gridLine, styles.gridLineHorizontalTwo]} />
-            <View style={[styles.gridLineVertical, styles.gridLineVerticalOne]} />
-            <View style={[styles.gridLineVertical, styles.gridLineVerticalTwo]} />
+            <View style={[styles.gridLine, styles.gridLineH1]} />
+            <View style={[styles.gridLine, styles.gridLineH2]} />
+            <View style={[styles.gridLineVertical, styles.gridLineV1]} />
+            <View style={[styles.gridLineVertical, styles.gridLineV2]} />
             <View style={styles.mapRoadOne} />
             <View style={styles.mapRoadTwo} />
             <View style={styles.mapPark} />
@@ -341,8 +347,8 @@ export function TrackingScreen() {
                           top: `${position.topPercent}%`,
                         },
                       ]}>
-                      <View style={[styles.mapPinPulse, selected && styles.mapPinPulseSelected]} />
-                      <View style={[styles.mapPin, selected && styles.mapPinSelected]}>
+                      <View style={[styles.mapPinPulse, selected ? styles.mapPinPulseSelected : undefined]} />
+                      <View style={[styles.mapPin, selected ? styles.mapPinSelected : undefined]}>
                         <AppText variant="label" tone="onPrimary">
                           {member.fullName.slice(0, 1).toUpperCase()}
                         </AppText>
@@ -448,8 +454,8 @@ export function TrackingScreen() {
         <AppCard padding="lg" style={styles.privacyInfoCard}>
           <AppText variant="bodyStrong">Cara kerja privasi Tracking</AppText>
           <View style={styles.privacyInfoList}>
-            <PrivacyInfoRow number="1" text="Lokasi hanya diambil ketika pengguna menekan tombol berbagi/perbarui." />
-            <PrivacyInfoRow number="2" text="DiaryQu hanya menyimpan posisi terakhir, bukan riwayat perjalanan." />
+            <PrivacyInfoRow number="1" text="Lokasi hanya diambil saat pengguna menekan tombol berbagi atau perbarui." />
+            <PrivacyInfoRow number="2" text="DiaryQu menyimpan posisi terakhir saja, bukan riwayat perjalanan." />
             <PrivacyInfoRow number="3" text="Saat berbagi dihentikan, koordinat terakhir dikosongkan dari database." />
             <PrivacyInfoRow number="4" text="RLS hanya memperlihatkan lokasi aktif kepada anggota Family Room yang sama." />
           </View>
@@ -631,8 +637,8 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#D2E3DF',
   },
-  gridLineHorizontalOne: {top: '33%'},
-  gridLineHorizontalTwo: {top: '66%'},
+  gridLineH1: {top: '33%'},
+  gridLineH2: {top: '66%'},
   gridLineVertical: {
     position: 'absolute',
     top: 0,
@@ -640,8 +646,8 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: '#D2E3DF',
   },
-  gridLineVerticalOne: {left: '33%'},
-  gridLineVerticalTwo: {left: '66%'},
+  gridLineV1: {left: '33%'},
+  gridLineV2: {left: '66%'},
   mapRoadOne: {
     position: 'absolute',
     width: '130%',
@@ -733,7 +739,11 @@ const styles = StyleSheet.create({
   freshDotRecent: {backgroundColor: colors.info},
   freshDotStale: {backgroundColor: colors.warningDark},
   mapEmptyOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
