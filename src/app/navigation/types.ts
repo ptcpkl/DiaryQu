@@ -19,5 +19,5 @@ export type MainTabParamList = {
   Agenda: undefined;
   Tracking: undefined;
   Routines: undefined;
-  Finance: undefined;
+  Finance: {module?: 'uangqu' | 'assetqu'} | undefined;
 };
