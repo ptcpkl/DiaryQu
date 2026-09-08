@@ -1,13 +1,14 @@
 import {create} from 'zustand';
 
-import {DEMO_USER_ID} from '../../../mocks/demoData';
 import {FRONTEND_DEMO_MODE} from '../../../config/appMode';
+import {getSupabaseClient} from '../../../lib/supabase/client';
+import {DEMO_USER_ID} from '../../../mocks/demoData';
+import {trackingService} from '../services/trackingService';
 import type {
   NativeLocationPosition,
   SharedFamilyLocation,
   TrackingMember,
 } from '../types';
-import {trackingService} from '../services/trackingService';
 
 interface TrackingState {
   members: TrackingMember[];
@@ -80,7 +81,6 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
       let currentUserId = get().currentUserId;
       if (!FRONTEND_DEMO_MODE) {
         try {
-          const {getSupabaseClient} = await import('../../../lib/supabase/client');
           const {data} = await getSupabaseClient().auth.getUser();
           currentUserId = data.user?.id ?? null;
         } catch {
