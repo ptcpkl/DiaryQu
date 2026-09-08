@@ -1,6 +1,7 @@
 import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import React, {useEffect, useMemo, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -31,8 +32,18 @@ import {
   spacing,
 } from '../../../constants/theme';
 import {DiaryQuBannerAd} from '../../ads/components/DiaryQuBannerAd';
+import {useAgendaStore} from '../../agenda/store/agendaStore';
+import type {AgendaEntry} from '../../agenda/types';
 import {useAuthStore} from '../../auth/store/authStore';
 import {useFamilyStore} from '../../family/store/familyStore';
+import {useRoutineStore} from '../../routines/store/routineStore';
+import {
+  localDateKey,
+  routineOccursOn,
+  submissionFor,
+} from '../../routines/utils/schedule';
+import {useTrackingStore} from '../../tracking/store/trackingStore';
+import {formatApproximateCoordinate} from '../../tracking/utils/tracking';
 import {
   formatHomeDate,
   formatHomeTime,
@@ -46,8 +57,9 @@ type QuickMenu = {
   helper: string;
   glyph: string;
   tone: 'green' | 'blue' | 'yellow' | 'pink';
-  target?: keyof MainTabParamList;
-  appTarget?: keyof AppStackParamList;
+  target?: 'Agenda' | 'Routines' | 'Finance';
+  financeModule?: 'uangqu' | 'assetqu';
+  appTarget?: 'Goresan' | 'Contribution';
 };
 
 type AgendaPreview = {
@@ -70,22 +82,16 @@ const QUICK_MENU: QuickMenu[] = [
   {label: 'Agenda', helper: 'Jadwal keluarga', glyph: '▦', tone: 'blue', target: 'Agenda'},
   {label: 'Rutinitas Hari Ini', helper: 'Cek tugas harian', glyph: '✓', tone: 'green', target: 'Routines'},
   {label: 'Goresan', helper: 'Catatan keluarga', glyph: '✎', tone: 'yellow', appTarget: 'Goresan'},
-  {label: 'Keuangan', helper: 'UangQu', glyph: '▣', tone: 'green', target: 'Finance'},
-  {label: 'AssetQu', helper: 'Aset keluarga', glyph: '▤', tone: 'blue', target: 'Finance'},
+  {label: 'Keuangan', helper: 'UangQu', glyph: '▣', tone: 'green', target: 'Finance', financeModule: 'uangqu'},
+  {label: 'AssetQu', helper: 'Aset keluarga', glyph: '▤', tone: 'blue', target: 'Finance', financeModule: 'assetqu'},
   {label: 'Kontribusi', helper: 'Berbagi kebaikan', glyph: '♥', tone: 'pink', appTarget: 'Contribution'},
 ];
 
-const AGENDA_PREVIEW: AgendaPreview[] = [
-  {id: 'agenda-1', dayLabel: 'Hari ini', title: "Kajian Ba'da Maghrib", time: '18.30 - 19.30', location: 'Masjid dekat rumah', category: 'Ibadah'},
-  {id: 'agenda-2', dayLabel: 'Besok', title: 'Belanja kebutuhan mingguan', time: '09.00 - 10.30', location: 'Pasar / supermarket', category: 'Keluarga'},
-];
-
-const FAMILY_PROGRESS: FamilyProgress[] = [
-  {id: 'member-head', name: 'Pak Dahlan', score: 8, target: 10},
-  {id: 'member-mom', name: 'Ibu', score: 7, target: 10},
-  {id: 'member-budi', name: 'Budi', score: 4, target: 10},
-  {id: 'member-siti', name: 'Siti', score: 6, target: 10},
-];
+const categoryLabel: Record<AgendaEntry['category'], string> = {
+  work: 'Kerja',
+  business: 'Bisnis',
+  islamic: 'Islami',
+};
 
 const toneBackground: Record<QuickMenu['tone'], string> = {
   green: colors.primarySoft,
@@ -101,33 +107,156 @@ const toneForeground: Record<QuickMenu['tone'], string> = {
   pink: '#C84B78',
 };
 
+function startOfToday(date = new Date()) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfTomorrow(date = new Date()) {
+  const next = startOfToday(date);
+  next.setDate(next.getDate() + 2);
+  return next;
+}
+
+function timeLabel(entry: AgendaEntry) {
+  const formatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const start = formatter.format(new Date(entry.startsAt)).replace('.', ':');
+  const end = entry.endsAt
+    ? formatter.format(new Date(entry.endsAt)).replace('.', ':')
+    : null;
+  return end ? `${start} - ${end}` : start;
+}
+
 export function HomeScreen({navigation}: Props) {
   const session = useAuthStore(state => state.session);
   const family = useFamilyStore(state => state.family);
+
+  const agendaItems = useAgendaStore(state => state.items);
+  const agendaError = useAgendaStore(state => state.error);
+  const loadAgendaRange = useAgendaStore(state => state.loadRange);
+
+  const routineMembers = useRoutineStore(state => state.members);
+  const routines = useRoutineStore(state => state.routines);
+  const submissions = useRoutineStore(state => state.submissions);
+  const routineError = useRoutineStore(state => state.error);
+  const loadRoutines = useRoutineStore(state => state.load);
+
+  const trackingLocations = useTrackingStore(state => state.locations);
+  const loadTracking = useTrackingStore(state => state.load);
+
   const [now, setNow] = useState(() => new Date());
   const {width} = useWindowDimensions();
   const appNavigation = navigation.getParent<NativeStackNavigationProp<AppStackParamList>>();
+  const familyId = family?.id ?? null;
+  const userId = session?.user.id ?? null;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!familyId) return;
+      const today = startOfToday();
+      loadAgendaRange(familyId, today.toISOString(), endOfTomorrow(today).toISOString()).catch(
+        () => undefined,
+      );
+      loadRoutines(familyId, localDateKey(today)).catch(() => undefined);
+      loadTracking(familyId).catch(() => undefined);
+    }, [familyId, loadAgendaRange, loadRoutines, loadTracking]),
+  );
+
   const displayName = useMemo(() => {
     const metadata = session?.user.user_metadata;
     if (metadata && typeof metadata.full_name === 'string' && metadata.full_name.trim()) {
       return metadata.full_name.trim();
     }
-    return session?.user.email?.split('@')[0] ?? 'Pak Dahlan';
+    return session?.user.email?.split('@')[0] ?? 'Pengguna DiaryQu';
   }, [session]);
 
   const firstName = displayName.split(/\s+/)[0] || displayName;
   const roleLabel = family?.role === 'head' ? 'Kepala Keluarga' : 'Anggota Keluarga';
   const useTwoColumnMenu = width < 365;
+  const todayKey = localDateKey(now);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = localDateKey(tomorrow);
+
+  const agendaPreview = useMemo<AgendaPreview[]>(
+    () =>
+      agendaItems
+        .filter(item => item.status !== 'completed')
+        .filter(item => {
+          const key = localDateKey(new Date(item.startsAt));
+          return key === todayKey || key === tomorrowKey;
+        })
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+        .slice(0, 2)
+        .map(item => ({
+          id: item.id,
+          dayLabel:
+            localDateKey(new Date(item.startsAt)) === todayKey ? 'Hari ini' : 'Besok',
+          title: item.title,
+          time: timeLabel(item),
+          location: item.location?.trim() || 'Lokasi belum diisi',
+          category: categoryLabel[item.category],
+        })),
+    [agendaItems, todayKey, tomorrowKey],
+  );
+
+  const familyProgress = useMemo<FamilyProgress[]>(() => {
+    const dueRoutines = routines.filter(routine => routineOccursOn(routine, now));
+    return routineMembers.map(member => {
+      const assigned = dueRoutines.filter(routine => routine.assigneeIds.includes(member.id));
+      const score = assigned.filter(routine => {
+        const submission = submissionFor(
+          submissions,
+          routine.id,
+          member.id,
+          todayKey,
+        );
+        return submission?.status === 'approved';
+      }).length;
+      return {
+        id: member.id,
+        name: member.fullName,
+        score,
+        target: assigned.length,
+      };
+    });
+  }, [now, routineMembers, routines, submissions, todayKey]);
+
+  const totalScore = familyProgress.reduce((total, member) => total + member.score, 0);
+  const totalTarget = familyProgress.reduce((total, member) => total + member.target, 0);
+
+  const myLocation = useMemo(
+    () => trackingLocations.find(item => item.userId === userId) ?? null,
+    [trackingLocations, userId],
+  );
+  const locationLabel =
+    myLocation?.sharingEnabled &&
+    myLocation.latitude !== null &&
+    myLocation.longitude !== null
+      ? `${formatApproximateCoordinate(myLocation.latitude)}, ${formatApproximateCoordinate(myLocation.longitude)}`
+      : 'Lokasi belum dibagikan';
 
   const openQuickMenu = (item: QuickMenu) => {
-    if (item.target) {
-      navigation.navigate(item.target);
+    if (item.target === 'Finance') {
+      navigation.navigate('Finance', {module: item.financeModule});
+      return;
+    }
+    if (item.target === 'Agenda') {
+      navigation.navigate('Agenda');
+      return;
+    }
+    if (item.target === 'Routines') {
+      navigation.navigate('Routines');
       return;
     }
     if (item.appTarget) {
@@ -187,10 +316,14 @@ export function HomeScreen({navigation}: Props) {
             </View>
           </View>
 
-          <View style={styles.locationBar}>
-            <AppText variant="caption" tone="onPrimary">⌖ Bekasi, Jawa Barat</AppText>
-            <AppText variant="micro" tone="onPrimary" style={styles.locationStatus}>Lokasi demo</AppText>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Buka lokasi keluarga"
+            onPress={() => navigation.navigate('Tracking')}
+            style={styles.locationBar}>
+            <AppText variant="caption" tone="onPrimary" numberOfLines={1}>⌖ {locationLabel}</AppText>
+            <AppText variant="micro" tone="onPrimary" style={styles.locationStatus}>Tracking ›</AppText>
+          </Pressable>
         </View>
 
         <DiaryQuBannerAd placement="beranda" />
@@ -208,23 +341,54 @@ export function HomeScreen({navigation}: Props) {
         </View>
 
         <View style={styles.sectionBlock}>
-          <SectionHeader title="Agenda Hari Ini & Esok" subtitle="Dua jadwal terdekat keluarga" actionLabel="Lihat semua" onAction={() => navigation.navigate('Agenda')} />
-          <View style={styles.agendaList}>{AGENDA_PREVIEW.map(item => <AgendaPreviewCard key={item.id} item={item} />)}</View>
+          <SectionHeader
+            title="Agenda Hari Ini & Esok"
+            subtitle="Jadwal terdekat keluarga"
+            actionLabel="Lihat semua"
+            onAction={() => navigation.navigate('Agenda')}
+          />
+          {agendaPreview.length > 0 ? (
+            <View style={styles.agendaList}>
+              {agendaPreview.map(item => <AgendaPreviewCard key={item.id} item={item} />)}
+            </View>
+          ) : (
+            <AppCard padding="lg" style={styles.emptySectionCard}>
+              <AppText variant="bodyStrong">Belum ada agenda terdekat</AppText>
+              <AppText variant="caption" tone="muted">
+                {agendaError ?? 'Agenda hari ini dan esok akan muncul otomatis di sini.'}
+              </AppText>
+            </AppCard>
+          )}
         </View>
 
         <View style={styles.sectionBlock}>
-          <SectionHeader title="Statistik Keluarga" subtitle="Progress rutinitas hari ini" actionLabel="Rutinitas" onAction={() => navigation.navigate('Routines')} />
+          <SectionHeader
+            title="Statistik Keluarga"
+            subtitle="Progress rutinitas hari ini"
+            actionLabel="Rutinitas"
+            onAction={() => navigation.navigate('Routines')}
+          />
           <AppCard elevated padding="lg" style={styles.familyStatsCard}>
             <View style={styles.familyStatsHeader}>
-              <View>
-                <AppText variant="bodyStrong" tone="primary">{family?.name ?? 'Keluarga Pak Dahlan'}</AppText>
-                <AppText variant="micro" tone="muted">4 anggota aktif</AppText>
+              <View style={styles.flexOne}>
+                <AppText variant="bodyStrong" tone="primary">{family?.name ?? 'Family Room'}</AppText>
+                <AppText variant="micro" tone="muted">
+                  {routineMembers.length} anggota terhubung
+                </AppText>
               </View>
               <View style={styles.scoreBadge}>
-                <AppText variant="label" tone="primary">25/40</AppText>
+                <AppText variant="label" tone="primary">{totalScore}/{totalTarget}</AppText>
               </View>
             </View>
-            <View style={styles.progressList}>{FAMILY_PROGRESS.map(member => <FamilyProgressRow key={member.id} member={member} />)}</View>
+            {familyProgress.length > 0 ? (
+              <View style={styles.progressList}>
+                {familyProgress.map(member => <FamilyProgressRow key={member.id} member={member} />)}
+              </View>
+            ) : (
+              <AppText variant="caption" tone="muted">
+                {routineError ?? 'Statistik akan muncul setelah anggota dan rutinitas tersedia.'}
+              </AppText>
+            )}
           </AppCard>
         </View>
 
@@ -232,12 +396,21 @@ export function HomeScreen({navigation}: Props) {
           <SectionHeader title="Lihat Menu" subtitle="Akses cepat fitur DiaryQu" />
           <View style={styles.quickGrid}>
             {QUICK_MENU.map(item => (
-              <QuickMenuTile key={item.label} item={item} twoColumns={useTwoColumnMenu} onPress={() => openQuickMenu(item)} />
+              <QuickMenuTile
+                key={item.label}
+                item={item}
+                twoColumns={useTwoColumnMenu}
+                onPress={() => openQuickMenu(item)}
+              />
             ))}
           </View>
         </View>
 
-        <View style={styles.familyRoomCard}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Buka informasi keluarga"
+          onPress={() => appNavigation?.navigate('FamilyInfo')}
+          style={styles.familyRoomCard}>
           <View style={styles.familyRoomAccent} />
           <View style={styles.familyRoomIllustration}>
             <View style={styles.familyHead} />
@@ -246,13 +419,15 @@ export function HomeScreen({navigation}: Props) {
           </View>
           <View style={styles.familyRoomCopy}>
             <AppText variant="micro" tone="onPrimary" style={styles.familyRoomKicker}>FAMILY ROOM</AppText>
-            <AppText variant="section" tone="onPrimary">{family?.name ?? 'Keluarga Pak Dahlan'}</AppText>
-            <AppText variant="caption" tone="onPrimary" style={styles.familyRoomDescription}>Bagikan kode ini hanya kepada anggota keluarga yang ingin bergabung.</AppText>
+            <AppText variant="section" tone="onPrimary">{family?.name ?? 'Family Room'}</AppText>
+            <AppText variant="caption" tone="onPrimary" style={styles.familyRoomDescription}>
+              Bagikan kode ini hanya kepada anggota keluarga yang ingin bergabung.
+            </AppText>
             <View style={styles.familyCodePill}>
-              <AppText variant="label" tone="onPrimary">Family Code: {family?.familyCode ?? 'DQ-7K4P9X'}</AppText>
+              <AppText variant="label" tone="onPrimary">Family Code: {family?.familyCode ?? '-'}</AppText>
             </View>
           </View>
-        </View>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -262,7 +437,9 @@ function AgendaPreviewCard({item}: {item: AgendaPreview}) {
   return (
     <AppCard elevated padding="md" style={styles.agendaCard}>
       <View style={styles.agendaTopRow}>
-        <View style={styles.agendaDayPill}><AppText variant="micro" tone="primary">{item.dayLabel}</AppText></View>
+        <View style={styles.agendaDayPill}>
+          <AppText variant="micro" tone="primary">{item.dayLabel}</AppText>
+        </View>
         <Chip label={item.category} tone="success" />
       </View>
       <AppText variant="bodyStrong" style={styles.agendaTitle}>{item.title}</AppText>
@@ -276,7 +453,9 @@ function AgendaPreviewCard({item}: {item: AgendaPreview}) {
 }
 
 function FamilyProgressRow({member}: {member: FamilyProgress}) {
-  const progress = Math.min(100, Math.round((member.score / member.target) * 100));
+  const progress = member.target > 0
+    ? Math.min(100, Math.round((member.score / member.target) * 100))
+    : 0;
   return (
     <View style={styles.progressRow}>
       <Avatar name={member.name} size="sm" bordered={false} />
@@ -285,15 +464,33 @@ function FamilyProgressRow({member}: {member: FamilyProgress}) {
           <AppText variant="caption">{member.name}</AppText>
           <AppText variant="micro" tone="muted">{member.score}/{member.target}</AppText>
         </View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, {width: `${progress}%`}]} /></View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, {width: `${progress}%`}]} />
+        </View>
       </View>
     </View>
   );
 }
 
-function QuickMenuTile({item, twoColumns, onPress}: {item: QuickMenu; twoColumns: boolean; onPress: () => void}) {
+function QuickMenuTile({
+  item,
+  twoColumns,
+  onPress,
+}: {
+  item: QuickMenu;
+  twoColumns: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={onPress} style={({pressed}) => [styles.quickTile, twoColumns ? styles.quickTileTwoColumns : styles.quickTileThreeColumns, pressed ? styles.quickTilePressed : undefined]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.quickTile,
+        twoColumns ? styles.quickTileTwoColumns : styles.quickTileThreeColumns,
+        pressed ? styles.quickTilePressed : undefined,
+      ]}>
       <View style={[styles.quickIcon, {backgroundColor: toneBackground[item.tone]}]}>
         <AppText variant="section" style={{color: toneForeground[item.tone]}}>{item.glyph}</AppText>
       </View>
@@ -331,6 +528,7 @@ const styles = StyleSheet.create({
   inspirationHeader: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   quoteText: {fontStyle: 'italic'},
   sectionBlock: {gap: spacing.md},
+  emptySectionCard: {gap: spacing.xs},
   agendaList: {gap: spacing.md},
   agendaCard: {gap: spacing.sm},
   agendaTopRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
