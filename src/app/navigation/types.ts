@@ -25,4 +25,5 @@ export type AppStackParamList = {
   AccountSettings: undefined;
   Contribution: undefined;
   Goresan: undefined;
+  MyRoutines: undefined;
 };
